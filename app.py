@@ -8,13 +8,13 @@ try:
 except:
     pass
 
+st.set_page_config(page_title="Kabu Analyzer", page_icon="📊", layout="wide")
+
 try:
     if 'EDINET_API_KEY' in st.secrets:
         os.environ['EDINET_API_KEY'] = st.secrets['EDINET_API_KEY']
 except:
     pass
-
-st.set_page_config(page_title="Kabu Analyzer", page_icon="📊", layout="wide")
 
 # ── EDINETコードマップ読み込み ──
 @st.cache_data
