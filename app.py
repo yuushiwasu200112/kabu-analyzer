@@ -2,7 +2,17 @@ import streamlit as st
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    load_dotenv()
+except:
+    pass
+
+# Streamlit Cloud対応: st.secretsから環境変数をセット
+try:
+    if 'EDINET_API_KEY' in st.secrets:
+        os.environ['EDINET_API_KEY'] = st.secrets['EDINET_API_KEY']
+except:
+    pass
 
 st.set_page_config(page_title="Kabu Analyzer", page_icon="📊", layout="wide")
 
