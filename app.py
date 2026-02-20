@@ -39,6 +39,86 @@ INDICATOR_FORMAT = {
     "純利益成長率": ("%", "成長性"), "総資産成長率": ("%", "成長性"),
 }
 
+# ── カスタムCSS ──
+st.markdown("""
+<style>
+    /* メインヘッダー */
+    .main-header {
+        background: linear-gradient(135deg, #1B3A5C 0%, #2E75B6 100%);
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+    .main-header h1 {
+        color: white;
+        font-size: 2.5rem;
+        margin: 0;
+    }
+    .main-header p {
+        color: #B8D4E8;
+        font-size: 1.1rem;
+        margin: 0.5rem 0 0 0;
+    }
+
+    /* メトリックカード */
+    [data-testid="stMetric"] {
+        background: #1B2332;
+        border: 1px solid #2E75B6;
+        border-radius: 10px;
+        padding: 15px;
+    }
+    [data-testid="stMetric"] label {
+        color: #8899AA;
+        font-size: 0.85rem;
+    }
+    [data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: #FFFFFF;
+        font-size: 1.8rem;
+    }
+
+    /* プログレスバー */
+    .stProgress > div > div {
+        background-color: #2E75B6;
+        border-radius: 5px;
+    }
+
+    /* ボタン */
+    .stButton > button {
+        background: linear-gradient(135deg, #2E75B6, #1B3A5C);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.6rem 2rem;
+        font-weight: bold;
+    }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #3A8FD4, #2E75B6);
+    }
+
+    /* サイドバー */
+    section[data-testid="stSidebar"] {
+        background: #0A1628;
+        border-right: 1px solid #1B2332;
+    }
+
+    /* データフレーム */
+    .stDataFrame {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    /* 区切り線 */
+    hr {
+        border-color: #1B2332;
+    }
+
+    /* フッター非表示 */
+    footer {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
 # ── サイドバー ──
 with st.sidebar:
     page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較"], index=0)
@@ -207,9 +287,12 @@ if page == "複数社比較":
 # ========================================
 # 銘柄分析ページ
 # ========================================
-st.title("📊 Kabu Analyzer")
-st.subheader("株式投資分析ツール")
-st.divider()
+st.markdown("""
+<div class='main-header'>
+    <h1>📊 Kabu Analyzer</h1>
+    <p>AI搭載 株式投資分析ツール ｜ 3,700社以上対応</p>
+</div>
+""", unsafe_allow_html=True)
 
 stock_code = st.text_input("🔍 証券コードまたは企業名を入力（例: 7203 / トヨタ）", key="main_input")
 
