@@ -57,7 +57,26 @@ with st.sidebar:
 
 st.divider()
 
-stock_code = st.text_input("🔍 証券コードを入力（例: 7203）", max_chars=4)
+# 検索方法の選択
+search_tab1, search_tab2 = st.tabs(["📝 証券コードで検索", "🔎 企業名で検索"])
+
+with search_tab1:
+    stock_code = st.text_input("証券コードを入力（例: 7203）", max_chars=4, key="code_input")
+
+with search_tab2:
+    search_name = st.text_input("企業名を入力（例: トヨタ）", key="name_input")
+    if search_name and len(search_name) >= 2:
+        matches = {k: v for k, v in CODE_MAP.items() if search_name in v["name"]}
+        if matches:
+            options = [f"{k} - {v['name']}" for k, v in list(matches.items())[:20]]
+            selected = st.selectbox("該当企業を選択", options, key="name_select")
+            if selected:
+                stock_code = selected.split(" - ")[0]
+        else:
+            st.info("該当する企業が見つかりませんでした")
+            stock_code = None
+    else:
+        stock_code = None
 
 if stock_code:
     if len(stock_code) != 4 or not stock_code.isdigit():
