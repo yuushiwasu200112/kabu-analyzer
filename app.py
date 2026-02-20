@@ -40,6 +40,13 @@ INDICATOR_FORMAT = {
 }
 
 # ── ヘッダー ──
+# ── ページ切り替え ──
+page = st.sidebar.radio("📌 メニュー", ["銘柄分析", "複数社比較"], index=0)
+
+if page == "複数社比較":
+    exec(open(os.path.join(os.path.dirname(__file__), 'ui', 'pages', 'compare.py')).read())
+    st.stop()
+
 st.title("📊 Kabu Analyzer")
 st.subheader("株式投資分析ツール")
 
