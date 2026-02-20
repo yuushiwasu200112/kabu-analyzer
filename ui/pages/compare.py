@@ -21,11 +21,20 @@ except:
 
 @st.cache_data
 def load_code_map():
-    path = os.path.join(os.path.dirname(__file__), "..", "..", "config", "edinet_code_map.json")
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+    # 複数のパスを試す
+    candidates = [
+        os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'edinet_code_map.json'),
+        os.path.join(os.getcwd(), 'config', 'edinet_code_map.json'),
+    ]
+    path = None
+    for p in candidates:
+        if os.path.exists(p):
+            path = p
+            break
+    if not path:
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 CODE_MAP = load_code_map()
 

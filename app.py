@@ -17,17 +17,17 @@ except:
     pass
 
 # ── EDINETコードマップ読み込み ──
-@st.cache_data
-def load_code_map():
-    path = os.path.join(os.path.dirname(__file__), "config", "edinet_code_map.json")
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+CODE_MAP = {}
+_try_paths = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'edinet_code_map.json'),
+    os.path.join(os.getcwd(), 'config', 'edinet_code_map.json'),
+]
+for _try_path in _try_paths:
+    if os.path.exists(_try_path):
+        with open(_try_path, 'r', encoding='utf-8') as _f:
+            CODE_MAP = json.load(_f)
+        break
 
-CODE_MAP = load_code_map()
-
-# 指標の表示フォーマット
 INDICATOR_FORMAT = {
     "ROE": ("%", "収益性"), "ROA": ("%", "収益性"),
     "営業利益率": ("%", "収益性"), "配当利回り": ("%", "収益性"),
@@ -39,50 +39,189 @@ INDICATOR_FORMAT = {
     "純利益成長率": ("%", "成長性"), "総資産成長率": ("%", "成長性"),
 }
 
-# ── ヘッダー ──
-# ── ページ切り替え ──
-page = st.sidebar.radio("📌 メニュー", ["銘柄分析", "複数社比較"], index=0)
-
-if page == "複数社比較":
-    exec(open(os.path.join(os.path.dirname(__file__), 'ui', 'pages', 'compare.py')).read())
-    st.stop()
-
-st.title("📊 Kabu Analyzer")
-st.subheader("株式投資分析ツール")
-
 # ── サイドバー ──
 with st.sidebar:
+    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較"], index=0)
+    st.divider()
     st.header("⚙️ 分析設定")
-    style = st.selectbox("投資スタイル", [
-        "バランス", "バリュー投資", "グロース投資", "高配当投資", "安定性重視"
-    ])
+    style = st.selectbox("投資スタイル", ["バランス", "バリュー投資", "グロース投資", "高配当投資", "安定性重視"])
     period = st.selectbox("投資期間", ["中期（1〜3年）", "短期（〜1年）", "長期（3年以上）"])
     st.divider()
     st.markdown(f"**📌 対応銘柄数: {len(CODE_MAP):,}社**")
-    st.caption("東証上場企業に対応")
     st.caption("Free版: 月5銘柄まで分析可能")
 
+# ── 共通関数 ──
+def search_yuho(edinet_code, api_key):
+    import requests, datetime
+    url = "https://api.edinet-fsa.go.jp/api/v2/documents.json"
+    found = []
+    today = datetime.date.today()
+    for year in range(today.year, today.year - 5, -1):
+        for month in [6, 7, 3, 4, 5, 8, 9]:
+            for day in range(15, 31):
+                try:
+                    d = datetime.date(year, month, day)
+                    if d > today: continue
+                    resp = requests.get(url, params={
+                        "date": f"{year}-{month:02d}-{day:02d}",
+                        "type": 2, "Subscription-Key": api_key,
+                    }, timeout=30)
+                    for doc in resp.json().get("results", []):
+                        if doc.get("edinetCode") == edinet_code and doc.get("docTypeCode") == "120":
+                            if doc["docID"] not in [x["docID"] for x in found]:
+                                found.append({"docID": doc["docID"], "periodEnd": doc.get("periodEnd", ""), "docDescription": doc.get("docDescription", "")})
+                except:
+                    continue
+            if any(str(year) in x.get("periodEnd", "") for x in found):
+                break
+        if len(found) >= 4:
+            break
+    found.sort(key=lambda x: x.get("periodEnd", ""), reverse=True)
+    return found[:4]
+
+def analyze_company(code, api_key):
+    from data_sources.stock_client import get_stock_info
+    from data_sources.cache_manager import get_cache, set_cache
+    from parsers.xbrl_parser import download_and_parse
+    from analysis.indicators import calc_indicators, calc_growth
+    from analysis.scoring import calc_total_score
+
+    company = CODE_MAP[code]
+    edinet_code = company["edinet_code"]
+
+    stock_info = get_stock_info(code)
+    price = stock_info["current_price"] if stock_info else 0
+
+    cache_key_docs = f"docs_{edinet_code}"
+    docs = get_cache(cache_key_docs, max_age_hours=168)
+    if not docs:
+        docs = search_yuho(edinet_code, api_key)
+        if docs: set_cache(cache_key_docs, docs)
+
+    if not docs: return None
+
+    cache_cur = f"xbrl_{docs[0]['docID']}"
+    current = get_cache(cache_cur)
+    if not current:
+        current = download_and_parse(docs[0]["docID"], api_key)
+        if current: set_cache(cache_cur, current)
+
+    previous = None
+    if len(docs) > 1:
+        cache_prev = f"xbrl_{docs[1]['docID']}"
+        previous = get_cache(cache_prev)
+        if not previous:
+            previous = download_and_parse(docs[1]["docID"], api_key)
+            if previous: set_cache(cache_prev, previous)
+
+    if not current: return None
+
+    indicators = calc_indicators(current, price)
+    if previous:
+        indicators.update(calc_growth(current, previous))
+
+    period_map = {"短期（〜1年）": "短期", "中期（1〜3年）": "中期", "長期（3年以上）": "長期"}
+    score_result = calc_total_score(indicators, style, period_map.get(period, "中期"))
+
+    return {"name": company["name"], "stock_info": stock_info, "current": current,
+            "previous": previous, "indicators": indicators, "score": score_result,
+            "docs": docs, "price": price}
+
+# ========================================
+# 複数社比較ページ
+# ========================================
+if page == "複数社比較":
+    st.title("⚖️ 複数社比較")
+    st.caption(f"最大3社まで並べて比較できます（対応: {len(CODE_MAP):,}社）")
+
+    cols_input = st.columns(3)
+    codes = []
+    for i in range(3):
+        with cols_input[i]:
+            code = st.text_input(f"銘柄{i+1}", max_chars=4, key=f"cmp_{i}", placeholder="証券コード")
+            if code and len(code) == 4 and code.isdigit() and code in CODE_MAP:
+                codes.append(code)
+                st.caption(f"✅ {CODE_MAP[code]['name']}")
+            elif code and len(code) == 4:
+                st.caption("❌ 未対応")
+
+    if len(codes) >= 2:
+        if st.button("🔍 比較分析を実行", type="primary"):
+            import plotly.graph_objects as go
+            import pandas as pd
+            API_KEY = os.getenv("EDINET_API_KEY")
+            results = {}
+            for code in codes:
+                with st.spinner(f"{CODE_MAP[code]['name']} を分析中..."):
+                    r = analyze_company(code, API_KEY)
+                    if r: results[code] = r
+
+            if len(results) >= 2:
+                st.divider()
+                st.subheader("🏆 総合スコア比較")
+                score_cols = st.columns(len(results))
+                for i, (code, data) in enumerate(results.items()):
+                    with score_cols[i]:
+                        s = data["score"]["total_score"]
+                        color = "🟢" if s >= 75 else "🟡" if s >= 50 else "🔴"
+                        st.metric(data["name"], f"{color} {s}点")
+
+                st.subheader("📊 カテゴリ別スコア比較")
+                fig_radar = go.Figure()
+                radar_colors = ["#2E75B6", "#E74C3C", "#2ECC71"]
+                for i, (code, data) in enumerate(results.items()):
+                    cats = list(data["score"]["category_scores"].keys())
+                    vals = list(data["score"]["category_scores"].values())
+                    fig_radar.add_trace(go.Scatterpolar(
+                        r=vals + [vals[0]], theta=cats + [cats[0]],
+                        fill="toself", name=data["name"], line_color=radar_colors[i % 3]))
+                fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                                        height=450, legend=dict(orientation="h", y=-0.1))
+                st.plotly_chart(fig_radar, use_container_width=True)
+
+                for cat in ["収益性", "安全性", "成長性", "割安度"]:
+                    st.markdown(f"**{cat}**")
+                    bar_cols = st.columns(len(results))
+                    for i, (code, data) in enumerate(results.items()):
+                        with bar_cols[i]:
+                            val = data["score"]["category_scores"].get(cat, 0)
+                            st.progress(val / 100, text=f"{data['name']}: {val}点")
+
+                st.divider()
+                st.subheader("📋 主要指標比較")
+                metrics = ["ROE", "ROA", "営業利益率", "自己資本比率", "PER", "PBR",
+                           "配当利回り", "売上高成長率", "営業利益成長率", "純利益成長率"]
+                table = {}
+                for code, data in results.items():
+                    table[data["name"]] = {m: f"{data['indicators'].get(m, 0):.2f}" if data['indicators'].get(m) is not None else "---" for m in metrics}
+                st.dataframe(pd.DataFrame(table), use_container_width=True)
+    elif len(codes) == 1:
+        st.info("📌 2社以上入力してください")
+    else:
+        st.info("📌 比較したい銘柄の証券コードを2〜3社分入力してください")
+
+    st.divider()
+    st.caption("⚠️ 本ツールは投資助言ではありません。")
+    st.stop()
+
+# ========================================
+# 銘柄分析ページ
+# ========================================
+st.title("📊 Kabu Analyzer")
+st.subheader("株式投資分析ツール")
 st.divider()
 
-# 検索方法の選択
-search_tab1, search_tab2 = st.tabs(["📝 証券コードで検索", "🔎 企業名で検索"])
+stock_code = st.text_input("🔍 証券コードまたは企業名を入力（例: 7203 / トヨタ）", key="main_input")
 
-with search_tab1:
-    stock_code = st.text_input("証券コードを入力（例: 7203）", max_chars=4, key="code_input")
-
-with search_tab2:
-    search_name = st.text_input("企業名を入力（例: トヨタ）", key="name_input")
-    if search_name and len(search_name) >= 2:
-        matches = {k: v for k, v in CODE_MAP.items() if search_name in v["name"]}
-        if matches:
-            options = [f"{k} - {v['name']}" for k, v in list(matches.items())[:20]]
-            selected = st.selectbox("該当企業を選択", options, key="name_select")
-            if selected:
-                stock_code = selected.split(" - ")[0]
-        else:
-            st.info("該当する企業が見つかりませんでした")
-            stock_code = None
+# 企業名で検索された場合
+if stock_code and not stock_code.isdigit():
+    matches = {k: v for k, v in CODE_MAP.items() if stock_code in v["name"]}
+    if matches:
+        options = [f"{k} - {v['name']}" for k, v in list(matches.items())[:20]]
+        selected = st.selectbox("該当企業を選択", options, key="name_select")
+        if selected: stock_code = selected.split(" - ")[0]
     else:
+        st.info("該当する企業が見つかりませんでした")
         stock_code = None
 
 if stock_code:
@@ -91,285 +230,113 @@ if stock_code:
     elif stock_code not in CODE_MAP:
         st.warning(f"⚠️ 証券コード {stock_code} はEDINETに登録されていません")
     else:
-        company_info = CODE_MAP[stock_code]
-        company_name = company_info["name"]
-        edinet_code = company_info["edinet_code"]
+        company_name = CODE_MAP[stock_code]["name"]
         st.success(f"✅ {company_name}（{stock_code}）を分析中...")
-
-        # ── 株価取得 ──
-        with st.spinner("株価データを取得中..."):
-            from data_sources.stock_client import get_stock_info
-            stock_info = get_stock_info(stock_code)
-
-        if not stock_info:
-            st.warning("⚠️ 株価データを取得できませんでした。財務データのみで分析します。")
-            stock_info = {
-                "stock_code": stock_code, "name": company_name,
-                "current_price": 0, "market_cap": 0,
-                "per": 0, "pbr": 0, "eps": 0, "bps": 0,
-                "dividend_yield": 0, "sector": "不明", "industry": "不明",
-            }
-
-        # 株価情報表示
-        if stock_info["current_price"] > 0:
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("現在株価", f"¥{stock_info['current_price']:,.0f}")
-            col2.metric("PER", f"{stock_info['per']:.1f}倍" if stock_info['per'] else "---")
-            col3.metric("PBR", f"{stock_info['pbr']:.2f}倍" if stock_info['pbr'] else "---")
-            cap = stock_info['market_cap']
-            if cap >= 1e12:
-                col4.metric("時価総額", f"¥{cap/1e12:.1f}兆")
-            elif cap > 0:
-                col4.metric("時価総額", f"¥{cap/1e8:.0f}億")
-            else:
-                col4.metric("時価総額", "---")
-
-        # ── EDINET有報を自動検索 ──
-        from data_sources.cache_manager import get_cache, set_cache
-
-        @st.cache_data(ttl=86400, show_spinner=False)
-        def search_yuho(edinet_code, api_key):
-            """有価証券報告書を自動検索"""
-            import requests
-            import datetime
-            url = "https://api.edinet-fsa.go.jp/api/v2/documents.json"
-            found = []
-            today = datetime.date.today()
-
-            for year in range(today.year, today.year - 5, -1):
-                for month in [6, 7, 3, 4, 5, 8, 9]:
-                    for day in range(15, 31):
-                        try:
-                            d = datetime.date(year, month, day)
-                            if d > today:
-                                continue
-                            resp = requests.get(url, params={
-                                "date": f"{year}-{month:02d}-{day:02d}",
-                                "type": 2, "Subscription-Key": api_key,
-                            }, timeout=30)
-                            for doc in resp.json().get("results", []):
-                                if doc.get("edinetCode") == edinet_code and doc.get("docTypeCode") == "120":
-                                    if doc["docID"] not in [d["docID"] for d in found]:
-                                        found.append({
-                                            "docID": doc["docID"],
-                                            "periodEnd": doc.get("periodEnd", ""),
-                                            "docDescription": doc.get("docDescription", ""),
-                                        })
-                        except:
-                            continue
-                    if any(str(year) in d.get("periodEnd", "") or str(year) in d.get("docDescription", "") for d in found):
-                        break
-                if len(found) >= 4:
-                    break
-
-            found.sort(key=lambda x: x.get("periodEnd", ""), reverse=True)
-            return found[:4]
-
         API_KEY = os.getenv("EDINET_API_KEY")
 
-        # キャッシュされた有報リストを確認
-        cache_key_docs = f"docs_{edinet_code}"
-        docs = get_cache(cache_key_docs, max_age_hours=168)  # 1週間キャッシュ
-        if not docs:
-            with st.spinner("有価証券報告書を検索中（初回は時間がかかります）..."):
-                docs = search_yuho(edinet_code, API_KEY)
-                if docs:
-                    set_cache(cache_key_docs, docs)
+        with st.spinner("分析データを取得中..."):
+            result = analyze_company(stock_code, API_KEY)
 
-        if not docs:
-            st.error("❌ 有価証券報告書が見つかりませんでした。この銘柄は未対応の可能性があります。")
+        if not result:
+            st.error("❌ 分析データの取得に失敗しました")
         else:
-            # ── 財務データ取得 ──
-            with st.spinner("財務データを取得中..."):
+            stock_info = result["stock_info"]
+            indicators = result["indicators"]
+            score_result = result["score"]
+
+            if stock_info and stock_info["current_price"] > 0:
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("現在株価", f"¥{stock_info['current_price']:,.0f}")
+                c2.metric("PER", f"{stock_info['per']:.1f}倍" if stock_info['per'] else "---")
+                c3.metric("PBR", f"{stock_info['pbr']:.2f}倍" if stock_info['pbr'] else "---")
+                cap = stock_info['market_cap']
+                c4.metric("時価総額", f"¥{cap/1e12:.1f}兆" if cap >= 1e12 else f"¥{cap/1e8:.0f}億" if cap > 0 else "---")
+
+            from analysis.filters import check_filters
+            warnings = check_filters(result["current"], result["previous"])
+            if warnings:
+                st.divider()
+                for w in warnings:
+                    st.error(f"{w['icon']} **{w['title']}**: {w['message']}") if w['level'] == 'danger' else st.warning(f"{w['icon']} **{w['title']}**: {w['message']}")
+
+            st.divider()
+            import plotly.graph_objects as go
+
+            score = score_result["total_score"]
+            judgment = score_result["judgment"]
+            sc = "🟢" if score >= 75 else "🟡" if score >= 50 else "🔴"
+
+            fig_g = go.Figure(go.Indicator(mode="gauge+number", value=score,
+                title={"text": f"{company_name} 総合スコア", "font": {"size": 20}},
+                number={"suffix": "点", "font": {"size": 48}},
+                gauge={"axis": {"range": [0, 100]}, "bar": {"color": "#2E75B6"},
+                       "steps": [{"range": [0,50], "color": "#FFCDD2"}, {"range": [50,75], "color": "#FFF9C4"}, {"range": [75,100], "color": "#C8E6C9"}],
+                       "threshold": {"line": {"color": "#1B3A5C", "width": 4}, "thickness": 0.75, "value": score}}))
+            fig_g.update_layout(height=280, margin=dict(t=60, b=20, l=30, r=30))
+            st.plotly_chart(fig_g, use_container_width=True)
+            st.markdown(f"### {sc} {judgment}")
+            st.caption(f"投資スタイル: {style} ｜ 投資期間: {period}")
+
+            cats = list(score_result["category_scores"].keys())
+            vals = list(score_result["category_scores"].values())
+            fig_r = go.Figure()
+            fig_r.add_trace(go.Scatterpolar(r=vals+[vals[0]], theta=cats+[cats[0]], fill='toself', line_color='#2E75B6', fillcolor='rgba(46,117,182,0.3)'))
+            fig_r.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100])), height=420)
+
+            cc, cd = st.columns([1, 1])
+            with cc: st.plotly_chart(fig_r, use_container_width=True)
+            with cd:
+                st.subheader("📊 カテゴリ別スコア")
+                for cat, cs in score_result["category_scores"].items():
+                    st.progress(cs / 100, text=f"{cat}: {cs}点")
+
+            st.divider()
+            st.subheader("📉 主要指標の推移")
+            docs = result["docs"]
+            if len(docs) >= 2:
                 from parsers.xbrl_parser import download_and_parse
-                from analysis.indicators import calc_indicators, calc_growth
-                from analysis.scoring import calc_total_score
+                from analysis.indicators import calc_indicators
+                from data_sources.cache_manager import get_cache, set_cache
+                all_y = {}
+                for doc in docs:
+                    ck = f"xbrl_{doc['docID']}"
+                    yd = get_cache(ck)
+                    if not yd:
+                        yd = download_and_parse(doc["docID"], API_KEY)
+                        if yd: set_cache(ck, yd)
+                    if yd:
+                        all_y[doc["periodEnd"][:4]] = calc_indicators(yd, result["price"])
+                if len(all_y) >= 2:
+                    yrs = sorted(all_y.keys())
+                    fig_t = go.Figure()
+                    for i, (n, k) in enumerate([("ROE","ROE"),("ROA","ROA"),("営業利益率","営業利益率"),("自己資本比率","自己資本比率")]):
+                        fig_t.add_trace(go.Scatter(x=yrs, y=[all_y[y].get(k,0) for y in yrs], mode="lines+markers", name=n, line=dict(color=["#2E75B6","#E74C3C","#2ECC71","#F39C12"][i], width=2)))
+                    fig_t.update_layout(height=400, xaxis_title="年度", yaxis_title="%", legend=dict(orientation="h", y=-0.2))
+                    st.plotly_chart(fig_t, use_container_width=True)
 
-                current = None
-                previous = None
+            st.divider()
+            st.subheader("📈 株価チャート（過去1年）")
+            try:
+                import yfinance as yf, time
+                time.sleep(1)
+                hist = yf.Ticker(f"{stock_code}.T").history(period="1y")
+                if not hist.empty and len(hist) > 10:
+                    fig_c = go.Figure(data=[go.Candlestick(x=hist.index, open=hist["Open"], high=hist["High"], low=hist["Low"], close=hist["Close"], increasing_line_color="#2E75B6", decreasing_line_color="#E74C3C")])
+                    fig_c.update_layout(height=400, xaxis_rangeslider_visible=False)
+                    st.plotly_chart(fig_c, use_container_width=True)
+                else: st.info("ℹ️ 株価チャートを取得できませんでした")
+            except: st.info("ℹ️ 株価チャートは一時的に利用できません（Rate Limit）")
 
-                # 最新期
-                cache_key_cur = f"xbrl_{docs[0]['docID']}"
-                current = get_cache(cache_key_cur)
-                if not current:
-                    current = download_and_parse(docs[0]["docID"], API_KEY)
-                    if current:
-                        set_cache(cache_key_cur, current)
+            st.divider()
+            st.subheader("📋 財務指標一覧")
+            for category in ["収益性", "安全性", "成長性", "割安度"]:
+                ci = {k: v for k, v in indicators.items() if k in INDICATOR_FORMAT and INDICATOR_FORMAT[k][1] == category}
+                if ci:
+                    st.markdown(f"**{category}**")
+                    cols = st.columns(len(ci))
+                    for i, (n, v) in enumerate(ci.items()):
+                        u = INDICATOR_FORMAT[n][0]
+                        cols[i].metric(n, f"{v:,.0f}{u}" if u == "円" else f"{v:.2f}{u}")
 
-                # 前期
-                if len(docs) > 1:
-                    cache_key_prev = f"xbrl_{docs[1]['docID']}"
-                    previous = get_cache(cache_key_prev)
-                    if not previous:
-                        previous = download_and_parse(docs[1]["docID"], API_KEY)
-                        if previous:
-                            set_cache(cache_key_prev, previous)
-
-            if not current:
-                st.error("❌ 財務データの取得に失敗しました")
-            else:
-                indicators = calc_indicators(current, stock_info["current_price"])
-                if previous:
-                    growth = calc_growth(current, previous)
-                    indicators.update(growth)
-
-                period_map = {"短期（〜1年）": "短期", "中期（1〜3年）": "中期", "長期（3年以上）": "長期"}
-                period_key = period_map.get(period, "中期")
-                result = calc_total_score(indicators, style, period_key)
-
-                # ── 強制フィルター ──
-                from analysis.filters import check_filters
-                filter_warnings = check_filters(current, previous)
-
-                if filter_warnings:
-                    st.divider()
-                    for w in filter_warnings:
-                        if w['level'] == 'danger':
-                            st.error(f"{w['icon']} **{w['title']}**: {w['message']}")
-                        else:
-                            st.warning(f"{w['icon']} **{w['title']}**: {w['message']}")
-
-                st.divider()
-
-                # ── ゲージチャート ──
-                import plotly.graph_objects as go
-
-                score = result["total_score"]
-                judgment = result["judgment"]
-                if score >= 75:
-                    score_color = "🟢"
-                elif score >= 50:
-                    score_color = "🟡"
-                else:
-                    score_color = "🔴"
-
-                fig_gauge = go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=score,
-                    title={"text": f"{company_name} 総合スコア", "font": {"size": 20}},
-                    number={"suffix": "点", "font": {"size": 48}},
-                    gauge={
-                        "axis": {"range": [0, 100], "tickwidth": 2},
-                        "bar": {"color": "#2E75B6"},
-                        "steps": [
-                            {"range": [0, 50], "color": "#FFCDD2"},
-                            {"range": [50, 75], "color": "#FFF9C4"},
-                            {"range": [75, 100], "color": "#C8E6C9"},
-                        ],
-                        "threshold": {
-                            "line": {"color": "#1B3A5C", "width": 4},
-                            "thickness": 0.75, "value": score,
-                        },
-                    },
-                ))
-                fig_gauge.update_layout(height=280, margin=dict(t=60, b=20, l=30, r=30))
-                st.plotly_chart(fig_gauge, use_container_width=True)
-                st.markdown(f"### {score_color} {judgment}")
-                st.caption(f"投資スタイル: {style} ｜ 投資期間: {period}")
-
-                # ── レーダーチャート + カテゴリバー ──
-                categories = list(result["category_scores"].keys())
-                scores_list = list(result["category_scores"].values())
-
-                fig = go.Figure()
-                fig.add_trace(go.Scatterpolar(
-                    r=scores_list + [scores_list[0]],
-                    theta=categories + [categories[0]],
-                    fill='toself', name=company_name,
-                    line_color='#2E75B6', fillcolor='rgba(46,117,182,0.3)',
-                ))
-                fig.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                    title=f"{company_name} カテゴリ別スコア", height=420,
-                )
-
-                col_chart, col_detail = st.columns([1, 1])
-                with col_chart:
-                    st.plotly_chart(fig, use_container_width=True)
-                with col_detail:
-                    st.subheader("📊 カテゴリ別スコア")
-                    for cat, cat_score in result["category_scores"].items():
-                        st.progress(cat_score / 100, text=f"{cat}: {cat_score}点")
-
-                # ── 時系列チャート ──
-                st.divider()
-                st.subheader("📉 主要指標の推移")
-
-                if len(docs) >= 2:
-                    all_years = {}
-                    for doc in docs:
-                        ck = f"xbrl_{doc['docID']}"
-                        yd = get_cache(ck)
-                        if not yd:
-                            yd = download_and_parse(doc["docID"], API_KEY)
-                            if yd:
-                                set_cache(ck, yd)
-                        if yd:
-                            yi = calc_indicators(yd, stock_info["current_price"])
-                            p = doc["periodEnd"][:4]
-                            all_years[p] = yi
-
-                    if len(all_years) >= 2:
-                        years = sorted(all_years.keys())
-                        trend_metrics = {
-                            "ROE (%)": [all_years[y].get("ROE", 0) for y in years],
-                            "ROA (%)": [all_years[y].get("ROA", 0) for y in years],
-                            "営業利益率 (%)": [all_years[y].get("営業利益率", 0) for y in years],
-                            "自己資本比率 (%)": [all_years[y].get("自己資本比率", 0) for y in years],
-                        }
-                        fig_trend = go.Figure()
-                        colors = ["#2E75B6", "#E74C3C", "#2ECC71", "#F39C12"]
-                        for i, (name, vals) in enumerate(trend_metrics.items()):
-                            fig_trend.add_trace(go.Scatter(
-                                x=years, y=vals, mode="lines+markers",
-                                name=name, line=dict(color=colors[i], width=2),
-                                marker=dict(size=8),
-                            ))
-                        fig_trend.update_layout(height=400, xaxis_title="年度", yaxis_title="%",
-                                                legend=dict(orientation="h", y=-0.2))
-                        st.plotly_chart(fig_trend, use_container_width=True)
-
-                # ── 株価チャート ──
-                st.divider()
-                st.subheader("📈 株価チャート（過去1年）")
-                try:
-                    import yfinance as yf
-                    import time
-                    time.sleep(1)
-                    ticker = yf.Ticker(f"{stock_code}.T")
-                    hist = ticker.history(period="1y")
-                    if not hist.empty and len(hist) > 10:
-                        fig_candle = go.Figure(data=[go.Candlestick(
-                            x=hist.index, open=hist["Open"], high=hist["High"],
-                            low=hist["Low"], close=hist["Close"],
-                            increasing_line_color="#2E75B6", decreasing_line_color="#E74C3C",
-                        )])
-                        fig_candle.update_layout(height=400, xaxis_rangeslider_visible=False,
-                                                 xaxis_title="日付", yaxis_title="株価（円）")
-                        st.plotly_chart(fig_candle, use_container_width=True)
-                    else:
-                        st.info("ℹ️ 株価チャートのデータを取得できませんでした")
-                except:
-                    st.info("ℹ️ 株価チャートは一時的に利用できません（Rate Limit）")
-
-                # ── 指標一覧 ──
-                st.divider()
-                st.subheader("📋 財務指標一覧")
-                for category in ["収益性", "安全性", "成長性", "割安度"]:
-                    cat_indicators = {
-                        k: v for k, v in indicators.items()
-                        if k in INDICATOR_FORMAT and INDICATOR_FORMAT[k][1] == category
-                    }
-                    if cat_indicators:
-                        st.markdown(f"**{category}**")
-                        cols = st.columns(len(cat_indicators))
-                        for i, (name, val) in enumerate(cat_indicators.items()):
-                            unit = INDICATOR_FORMAT[name][0]
-                            if unit == "円":
-                                cols[i].metric(name, f"{val:,.0f}{unit}")
-                            else:
-                                cols[i].metric(name, f"{val:.2f}{unit}")
-
-# ── フッター ──
 st.divider()
 st.caption("⚠️ 本ツールは投資助言ではありません。投資判断はご自身の責任で行ってください。データの正確性は保証されません。")
