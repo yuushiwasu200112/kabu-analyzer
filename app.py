@@ -137,7 +137,7 @@ st.markdown("""
 
 # ── サイドバー ──
 with st.sidebar:
-    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較", "ランキング", "ウォッチリスト", "ポートフォリオ", "配当カレンダー"], index=0)
+    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較", "ランキング", "ウォッチリスト", "ポートフォリオ", "配当カレンダー", "アラート"], index=0)
     st.divider()
     st.header("⚙️ 分析設定")
     style = st.selectbox("投資スタイル", ["バランス", "バリュー投資", "グロース投資", "高配当投資", "安定性重視"])
@@ -860,190 +860,169 @@ if page == "配当カレンダー":
     st.stop()
 
 # ========================================
-# 銘柄分析ページ
+# アラートページ
+# ========================================
+if page == "アラート":
+    st.title("🔔 アラート設定")
+    st.caption("銘柄の条件を設定して、条件達成時に通知を受け取れます")
+
+    # セッション初期化
+    if "alerts" not in st.session_state:
+        st.session_state.alerts = []
+    if "alert_history" not in st.session_state:
+        st.session_state.alert_history = []
+
+    # アラート追加
+    st.subheader("➕ 新しいアラートを作成")
+    al_col1, al_col2, al_col3, al_col4 = st.columns([2, 2, 2, 1])
+    with al_col1:
+        al_code = st.text_input("証券コード", max_chars=4, key="al_code", placeholder="例: 7203")
+    with al_col2:
+        al_type = st.selectbox("条件タイプ", [
+            "総合スコアが○点以上", "総合スコアが○点以下",
+            "収益性が○点以上", "安全性が○点以上",
+            "成長性が○点以上", "割安度が○点以上",
+            "ROEが○%以上", "PERが○倍以下",
+            "配当利回りが○%以上",
+        ], key="al_type")
+    with al_col3:
+        al_value = st.number_input("しきい値", min_value=0.0, value=70.0, step=5.0, key="al_value")
+    with al_col4:
+        st.write("")
+        st.write("")
+        if st.button("🔔 追加", type="primary", key="al_add"):
+            if al_code and len(al_code) == 4 and al_code in CODE_MAP:
+                alert = {
+                    "code": al_code,
+                    "name": CODE_MAP[al_code]["name"],
+                    "type": al_type,
+                    "value": al_value,
+                    "active": True,
+                    "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M") if "datetime" in dir() else "now",
+                }
+                st.session_state.alerts.append(alert)
+                st.success(f"✅ {CODE_MAP[al_code]['name']} のアラートを設定しました")
+            elif al_code:
+                st.error("❌ 未対応の証券コードです")
+
+    # アラート一覧
+    if st.session_state.alerts:
+        st.divider()
+        st.subheader("📋 設定中のアラート")
+
+        for i, alert in enumerate(st.session_state.alerts):
+            acol1, acol2, acol3, acol4 = st.columns([2, 3, 2, 1])
+            with acol1:
+                status = "🟢" if alert["active"] else "⏸️"
+                st.markdown(f"{status} **{alert['code']}** {alert['name'][:8]}")
+            with acol2:
+                st.markdown(f"{alert['type']}（{alert['value']}）")
+            with acol3:
+                if alert["active"]:
+                    if st.button("⏸️ 停止", key=f"al_pause_{i}"):
+                        st.session_state.alerts[i]["active"] = False
+                        st.rerun()
+                else:
+                    if st.button("▶️ 再開", key=f"al_resume_{i}"):
+                        st.session_state.alerts[i]["active"] = True
+                        st.rerun()
+            with acol4:
+                if st.button("🗑️", key=f"al_del_{i}"):
+                    st.session_state.alerts.pop(i)
+                    st.rerun()
+
+        # アラートチェック実行
+        st.divider()
+        if st.button("🔍 アラートを今すぐチェック", type="primary"):
+            API_KEY = os.getenv("EDINET_API_KEY")
+            active_alerts = [a for a in st.session_state.alerts if a["active"]]
+            triggered = []
+
+            progress = st.progress(0, text="チェック中...")
+            codes_to_check = list(set(a["code"] for a in active_alerts))
+            results_cache = {}
+
+            for idx, code in enumerate(codes_to_check):
+                progress.progress((idx + 1) / len(codes_to_check), text=f"{CODE_MAP[code]['name']} をチェック中...")
+                try:
+                    r = analyze_company(code, API_KEY)
+                    if r:
+                        results_cache[code] = r
+                except:
+                    continue
+            progress.empty()
+
+            for alert in active_alerts:
+                r = results_cache.get(alert["code"])
+                if not r:
+                    continue
+
+                score = r["score"]["total_score"]
+                cats = r["score"]["category_scores"]
+                inds = r["indicators"]
+                val = alert["value"]
+                met = False
+                actual = 0
+
+                if "総合スコアが" in alert["type"] and "以上" in alert["type"]:
+                    met = score >= val
+                    actual = score
+                elif "総合スコアが" in alert["type"] and "以下" in alert["type"]:
+                    met = score <= val
+                    actual = score
+                elif "収益性が" in alert["type"]:
+                    actual = cats.get("収益性", 0)
+                    met = actual >= val
+                elif "安全性が" in alert["type"]:
+                    actual = cats.get("安全性", 0)
+                    met = actual >= val
+                elif "成長性が" in alert["type"]:
+                    actual = cats.get("成長性", 0)
+                    met = actual >= val
+                elif "割安度が" in alert["type"]:
+                    actual = cats.get("割安度", 0)
+                    met = actual >= val
+                elif "ROEが" in alert["type"]:
+                    actual = inds.get("ROE", 0)
+                    met = actual >= val
+                elif "PERが" in alert["type"] and "以下" in alert["type"]:
+                    actual = inds.get("PER", 999)
+                    met = actual <= val and actual > 0
+                elif "配当利回りが" in alert["type"]:
+                    actual = inds.get("配当利回り", 0)
+                    met = actual >= val
+
+                if met:
+                    triggered.append({
+                        "code": alert["code"],
+                        "name": alert["name"],
+                        "type": alert["type"],
+                        "threshold": val,
+                        "actual": actual,
+                        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M") if "datetime" in dir() else "now",
+                    })
+
+            if triggered:
+                st.subheader("🚨 アラート発動！")
+                for t in triggered:
+                    st.success(f"🔔 **{t['name']}（{t['code']}）**: {t['type']}（設定値: {t['threshold']} → 実績値: {t['actual']:.2f}）")
+                    st.session_state.alert_history.append(t)
+            else:
+                st.info("📌 条件を満たすアラートはありませんでした")
+
+    # アラート履歴
+    if st.session_state.alert_history:
+        st.divider()
+        st.subheader("📜 アラート履歴")
+        for h in reversed(st.session_state.alert_history[-10:]):
+            st.caption(f"🔔 {h.get('time','')} | {h['name']}（{h['code']}）: {h['type']} → {h['actual']:.2f}")
+
+    if not st.session_state.alerts:
+        st.info("📌 アラートを設定すると、条件達成時に通知を受け取れます")
+
+    st.divider()
+    st.caption("⚠️ 本ツールは投資助言ではありません。")
+    st.stop()
+
 # ========================================
 # 銘柄分析ページ
-
-st.markdown("""
-<div class='main-header'>
-    <h1>📊 Kabu Analyzer</h1>
-    <p>AI搭載 株式投資分析ツール ｜ 3,700社以上対応</p>
-</div>
-""", unsafe_allow_html=True)
-
-stock_code = st.text_input("🔍 証券コードまたは企業名を入力（例: 7203 / トヨタ）", key="main_input")
-
-if stock_code and not stock_code.isdigit():
-    matches = {k: v for k, v in CODE_MAP.items() if stock_code in v["name"]}
-    if matches:
-        options = [f"{k} - {v['name']}" for k, v in list(matches.items())[:20]]
-        selected = st.selectbox("該当企業を選択", options, key="name_select")
-        if selected: stock_code = selected.split(" - ")[0]
-    else:
-        st.info("該当する企業が見つかりませんでした")
-        stock_code = None
-
-if stock_code:
-    if len(stock_code) != 4 or not stock_code.isdigit():
-        st.error("❌ 4桁の数字を入力してください")
-    elif stock_code not in CODE_MAP:
-        st.warning(f"⚠️ 証券コード {stock_code} はEDINETに登録されていません")
-    else:
-        company_name = CODE_MAP[stock_code]["name"]
-        st.success(f"✅ {company_name}（{stock_code}）を分析中...")
-        API_KEY = os.getenv("EDINET_API_KEY")
-
-        # 使用制限チェック
-        username = st.session_state.get("username", "guest")
-        if username == "guest":
-            guest_usage = st.session_state.get("guest_usage", 0)
-            can_use = guest_usage < 5
-            usage = guest_usage
-            limit = 5
-        else:
-            can_use, usage, limit = check_usage_limit(username)
-        if not can_use:
-            st.error(f"❌ 今月の分析回数上限（{limit}回）に達しました。Proプランにアップグレードすると月50回まで分析できます。")
-            st.info("💡 プランのアップグレードはサイドバーのユーザー情報からお手続きください。")
-            st.stop()
-
-        with st.spinner("分析データを取得中..."):
-            result = analyze_company(stock_code, API_KEY)
-            if result:
-                if username == "guest":
-                    st.session_state.guest_usage = st.session_state.get("guest_usage", 0) + 1
-                else:
-                    update_usage(username)
-
-        if not result:
-            st.error("❌ 分析データの取得に失敗しました")
-        else:
-            stock_info = result["stock_info"]
-            indicators = result["indicators"]
-            score_result = result["score"]
-
-            if stock_info and stock_info["current_price"] > 0:
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("現在株価", f"¥{stock_info['current_price']:,.0f}")
-                c2.metric("PER", f"{stock_info['per']:.1f}倍" if stock_info['per'] else "---")
-                c3.metric("PBR", f"{stock_info['pbr']:.2f}倍" if stock_info['pbr'] else "---")
-                cap = stock_info['market_cap']
-                c4.metric("時価総額", f"¥{cap/1e12:.1f}兆" if cap >= 1e12 else f"¥{cap/1e8:.0f}億" if cap > 0 else "---")
-
-            from analysis.filters import check_filters
-            warnings = check_filters(result["current"], result["previous"])
-            if warnings:
-                st.divider()
-                for w in warnings:
-                    if w['level'] == 'danger':
-                        st.error(f"{w['icon']} **{w['title']}**: {w['message']}")
-                    else:
-                        st.warning(f"{w['icon']} **{w['title']}**: {w['message']}")
-
-            st.divider()
-            import plotly.graph_objects as go
-
-            score = score_result["total_score"]
-            judgment = score_result["judgment"]
-            sc = "🟢" if score >= 75 else "🟡" if score >= 50 else "🔴"
-
-            fig_g = go.Figure(go.Indicator(mode="gauge+number", value=score,
-                title={"text": f"{company_name} 総合スコア", "font": {"size": 20}},
-                number={"suffix": "点", "font": {"size": 48}},
-                gauge={"axis": {"range": [0, 100]}, "bar": {"color": "#2E75B6"},
-                       "steps": [{"range": [0,50], "color": "#FFCDD2"}, {"range": [50,75], "color": "#FFF9C4"}, {"range": [75,100], "color": "#C8E6C9"}],
-                       "threshold": {"line": {"color": "#1B3A5C", "width": 4}, "thickness": 0.75, "value": score}}))
-            fig_g.update_layout(height=280, margin=dict(t=60, b=20, l=30, r=30))
-            st.plotly_chart(fig_g, use_container_width=True)
-            st.markdown(f"### {sc} {judgment}")
-            st.caption(f"投資スタイル: {style} ｜ 投資期間: {period}")
-
-            cats = list(score_result["category_scores"].keys())
-            vals = list(score_result["category_scores"].values())
-            fig_r = go.Figure()
-            fig_r.add_trace(go.Scatterpolar(r=vals+[vals[0]], theta=cats+[cats[0]], fill='toself', line_color='#2E75B6', fillcolor='rgba(46,117,182,0.3)'))
-            fig_r.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100])), height=420)
-
-            cc, cd = st.columns([1, 1])
-            with cc: st.plotly_chart(fig_r, use_container_width=True)
-            with cd:
-                st.subheader("📊 カテゴリ別スコア")
-                for cat, cs in score_result["category_scores"].items():
-                    st.progress(cs / 100, text=f"{cat}: {cs}点")
-
-            # ウォッチリスト追加
-            if "watchlist" not in st.session_state:
-                st.session_state.watchlist = []
-            if stock_code not in st.session_state.watchlist:
-                if st.button("⭐ ウォッチリストに追加"):
-                    st.session_state.watchlist.append(stock_code)
-                    st.success("✅ ウォッチリストに追加しました")
-            else:
-                st.info("⭐ ウォッチリスト登録済み")
-
-            # PDFレポート
-            import datetime as dt_mod
-            from reports.pdf_report import generate_pdf
-            from analysis.filters import check_filters as cf2
-            pdf_warnings = cf2(result['current'], result['previous'])
-            pdf_bytes = generate_pdf(
-                company_name, stock_code, indicators, score_result,
-                warnings=pdf_warnings, stock_info=stock_info,
-            )
-            st.download_button(
-                label="📄 PDFレポートをダウンロード",
-                data=pdf_bytes,
-                file_name=f"kabu_analyzer_{stock_code}_{dt_mod.datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-            )
-
-            st.divider()
-            st.subheader("📉 主要指標の推移")
-            docs = result["docs"]
-            if len(docs) >= 2:
-                from parsers.xbrl_parser import download_and_parse
-                from analysis.indicators import calc_indicators
-                from data_sources.cache_manager import get_cache, set_cache
-                all_y = {}
-                for doc in docs:
-                    ck = f"xbrl_{doc['docID']}"
-                    yd = get_cache(ck)
-                    if not yd:
-                        yd = download_and_parse(doc["docID"], API_KEY)
-                        if yd: set_cache(ck, yd)
-                    if yd:
-                        all_y[doc["periodEnd"][:4]] = calc_indicators(yd, result["price"])
-                if len(all_y) >= 2:
-                    yrs = sorted(all_y.keys())
-                    fig_t = go.Figure()
-                    for i, (n, k) in enumerate([("ROE","ROE"),("ROA","ROA"),("営業利益率","営業利益率"),("自己資本比率","自己資本比率")]):
-                        fig_t.add_trace(go.Scatter(x=yrs, y=[all_y[y].get(k,0) for y in yrs], mode="lines+markers", name=n, line=dict(color=["#2E75B6","#E74C3C","#2ECC71","#F39C12"][i], width=2)))
-                    fig_t.update_layout(height=400, xaxis_title="年度", yaxis_title="%", legend=dict(orientation="h", y=-0.2))
-                    st.plotly_chart(fig_t, use_container_width=True)
-
-            st.divider()
-            st.subheader("📈 株価チャート（過去1年）")
-            try:
-                import yfinance as yf, time
-                time.sleep(1)
-                hist = yf.Ticker(f"{stock_code}.T").history(period="1y")
-                if not hist.empty and len(hist) > 10:
-                    fig_c = go.Figure(data=[go.Candlestick(x=hist.index, open=hist["Open"], high=hist["High"], low=hist["Low"], close=hist["Close"], increasing_line_color="#2E75B6", decreasing_line_color="#E74C3C")])
-                    fig_c.update_layout(height=400, xaxis_rangeslider_visible=False)
-                    st.plotly_chart(fig_c, use_container_width=True)
-                else: st.info("ℹ️ 株価チャートを取得できませんでした")
-            except: st.info("ℹ️ 株価チャートは一時的に利用できません（Rate Limit）")
-
-            st.divider()
-            st.subheader("📋 財務指標一覧")
-            for category in ["収益性", "安全性", "成長性", "割安度"]:
-                ci = {k: v for k, v in indicators.items() if k in INDICATOR_FORMAT and INDICATOR_FORMAT[k][1] == category}
-                if ci:
-                    st.markdown(f"**{category}**")
-                    cols = st.columns(len(ci))
-                    for i, (n, v) in enumerate(ci.items()):
-                        u = INDICATOR_FORMAT[n][0]
-                        cols[i].metric(n, f"{v:,.0f}{u}" if u == "円" else f"{v:.2f}{u}")
-
-st.divider()
-st.caption("⚠️ 本ツールは投資助言ではありません。投資判断はご自身の責任で行ってください。")
