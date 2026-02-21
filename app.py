@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import json
+import io
 import datetime
 from dotenv import load_dotenv
 
@@ -416,6 +417,16 @@ if page == "ランキング":
             df = df[["順位", "証券コード", "企業名", "総合スコア", "収益性", "安全性", "成長性", "割安度", "ROE", "PER", "配当利回り"]]
             st.dataframe(df, use_container_width=True, hide_index=True)
 
+            # エクスポート
+            exp_col1, exp_col2 = st.columns(2)
+            with exp_col1:
+                csv = df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 CSVダウンロード", csv, "ranking.csv", "text/csv")
+            with exp_col2:
+                buf = io.BytesIO()
+                df.to_excel(buf, index=False, engine='openpyxl')
+                st.download_button("📥 Excelダウンロード", buf.getvalue(), "ranking.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
             # カテゴリ別TOP5
             st.divider()
             cat_cols = st.columns(4)
@@ -722,6 +733,16 @@ if page == "ポートフォリオ":
                 df.columns = ["コード", "企業名", "金額(万)", "構成比%", "総合", "収益性", "安全性", "成長性", "割安度", "ROE", "配当利回り"]
                 df["構成比%"] = df["構成比%"].round(1)
                 st.dataframe(df, use_container_width=True, hide_index=True)
+
+                # エクスポート
+                pf_exp1, pf_exp2 = st.columns(2)
+                with pf_exp1:
+                    csv = df.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button("📥 CSVダウンロード", csv, "portfolio.csv", "text/csv", key="pf_csv")
+                with pf_exp2:
+                    buf = io.BytesIO()
+                    df.to_excel(buf, index=False, engine='openpyxl')
+                    st.download_button("📥 Excelダウンロード", buf.getvalue(), "portfolio.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="pf_xlsx")
 
         # クリアボタン
         if st.button("🗑️ ポートフォリオをクリア", key="pf_clear"):
@@ -1426,6 +1447,16 @@ if page == "スクリーニング":
             df = df[["code","name","total","prof","safe","grow","val","roe","per","dividend","pbr","margin"]]
             df.columns = ["コード","企業名","総合","収益性","安全性","成長性","割安度","ROE","PER","配当利回り","PBR","営業利益率"]
             st.dataframe(df, use_container_width=True, hide_index=True)
+
+            # エクスポート
+            scr_exp1, scr_exp2 = st.columns(2)
+            with scr_exp1:
+                csv = df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 CSVダウンロード", csv, "screening.csv", "text/csv", key="scr_csv")
+            with scr_exp2:
+                buf = io.BytesIO()
+                df.to_excel(buf, index=False, engine='openpyxl')
+                st.download_button("📥 Excelダウンロード", buf.getvalue(), "screening.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="scr_xlsx")
 
             # TOP銘柄のレーダー比較
             if len(matched) >= 2:
