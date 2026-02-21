@@ -40,6 +40,16 @@ INDICATOR_FORMAT = {
     "純利益成長率": ("%", "成長性"), "総資産成長率": ("%", "成長性"),
 }
 
+# ── 認証チェック ──
+from auth.auth_manager import show_login_page, check_usage_limit, update_usage, PLANS
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    show_login_page()
+    st.stop()
+
 # ── カスタムCSS ──
 st.markdown("""
 <style>
@@ -129,7 +139,27 @@ with st.sidebar:
     period = st.selectbox("投資期間", ["中期（1〜3年）", "短期（〜1年）", "長期（3年以上）"])
     st.divider()
     st.markdown(f"**📌 対応銘柄数: {len(CODE_MAP):,}社**")
-    st.caption("Free版: 月5銘柄まで分析可能")
+
+    # ユーザー情報
+    st.divider()
+    username = st.session_state.get("username", "guest")
+    user_info = st.session_state.get("user_info", {})
+    plan_name = PLANS.get(user_info.get("plan", "free"), PLANS["free"])["name"]
+    st.markdown(f"👤 **{username}** ({plan_name})")
+
+    if username != "guest":
+        can_use, usage, limit = check_usage_limit(username)
+        if limit == -1:
+            st.caption(f"今月の分析: {usage}回（無制限）")
+        else:
+            st.caption(f"今月の分析: {usage}/{limit}回")
+            st.progress(min(usage / limit, 1.0))
+
+    if st.button("🚪 ログアウト"):
+        st.session_state.logged_in = False
+        st.session_state.username = None
+        st.session_state.user_info = None
+        st.rerun()
 
 # ── 共通関数 ──
 def search_yuho(edinet_code, api_key):
