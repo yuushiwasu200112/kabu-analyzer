@@ -207,6 +207,19 @@ def search_yuho(edinet_code, api_key):
     found.sort(key=lambda x: x.get("periodEnd", ""), reverse=True)
     return found[:4]
 
+
+@st.cache_data(ttl=3600)
+def _load_major_stocks():
+    for p in [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'major_stocks.json'),
+        os.path.join(os.getcwd(), 'config', 'major_stocks.json'),
+    ]:
+        if os.path.exists(p):
+            with open(p, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    return {}
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def analyze_company(code, api_key):
     from data_sources.stock_client import get_stock_info
     from data_sources.cache_manager import get_cache, set_cache
@@ -340,13 +353,7 @@ if page == "ランキング":
     st.caption(f"投資スタイル: {style} ｜ 投資期間: {period}")
 
     # 主要銘柄リスト読み込み
-    major_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'major_stocks.json')
-    if not os.path.exists(major_path):
-        major_path = os.path.join(os.getcwd(), 'config', 'major_stocks.json')
-    major_stocks = {}
-    if os.path.exists(major_path):
-        with open(major_path, 'r', encoding='utf-8') as f:
-            major_stocks = json.load(f)
+    major_stocks = _load_major_stocks()
 
     rank_col1, rank_col2 = st.columns(2)
     with rank_col1:
@@ -366,14 +373,16 @@ if page == "ランキング":
         progress = st.progress(0, text="分析中...")
         total = len(target_stocks)
 
-        for idx, (code, name) in enumerate(target_stocks.items()):
-            progress.progress((idx + 1) / total, text=f"{name}（{code}）を分析中... ({idx+1}/{total})")
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _analyze_one(code_name):
+            code, name = code_name
             if code not in CODE_MAP:
-                continue
+                return None
             try:
                 r = analyze_company(code, API_KEY)
                 if r:
-                    rankings.append({
+                    return {
                         "code": code,
                         "name": r["name"],
                         "total": r["score"]["total_score"],
@@ -384,9 +393,20 @@ if page == "ランキング":
                         "roe": r["indicators"].get("ROE", 0),
                         "per": r["indicators"].get("PER", 0),
                         "dividend": r["indicators"].get("配当利回り", 0),
-                    })
+                    }
             except:
-                continue
+                pass
+            return None
+
+        done_count = 0
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {executor.submit(_analyze_one, (code, name)): code for code, name in target_stocks.items()}
+            for future in as_completed(futures):
+                done_count += 1
+                progress.progress(done_count / total, text=f"分析中... ({done_count}/{total})")
+                result_one = future.result()
+                if result_one:
+                    rankings.append(result_one)
 
         progress.empty()
 
@@ -1261,7 +1281,7 @@ if page == "バックテスト":
                     stock_prices = {}
                     try:
                         import yfinance as yf, time
-                        time.sleep(1)
+                        time.sleep(0.5)
                         ticker = yf.Ticker(f"{bt_code}.T")
                         hist = ticker.history(period="5y")
                         if not hist.empty:
@@ -1379,13 +1399,7 @@ if page == "スクリーニング":
         min_val = st.slider("割安度スコア（最低）", 0, 100, 0, 10)
 
     # 対象銘柄
-    major_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'major_stocks.json')
-    if not os.path.exists(major_path):
-        major_path = os.path.join(os.getcwd(), 'config', 'major_stocks.json')
-    major_stocks = {}
-    if os.path.exists(major_path):
-        with open(major_path, 'r', encoding='utf-8') as f:
-            major_stocks = json.load(f)
+    major_stocks = _load_major_stocks()
 
     sc_count = st.selectbox("対象銘柄数", ["上位30銘柄（速い）", "上位100銘柄", "全300銘柄（時間かかる）"], index=0)
     count_map = {"上位30銘柄（速い）": 30, "上位100銘柄": 100, "全300銘柄（時間かかる）": 300}
@@ -1694,7 +1708,7 @@ if stock_code:
             st.subheader("📈 株価チャート（過去1年）")
             try:
                 import yfinance as yf, time
-                time.sleep(1)
+                time.sleep(0.5)
                 hist = yf.Ticker(f"{stock_code}.T").history(period="1y")
                 if not hist.empty and len(hist) > 10:
                     fig_c = go.Figure(data=[go.Candlestick(x=hist.index, open=hist["Open"], high=hist["High"], low=hist["Low"], close=hist["Close"], increasing_line_color="#2E75B6", decreasing_line_color="#E74C3C")])
