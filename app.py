@@ -137,7 +137,7 @@ st.markdown("""
 
 # ── サイドバー ──
 with st.sidebar:
-    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較", "ランキング", "ウォッチリスト", "ポートフォリオ", "配当カレンダー", "アラート", "セクター分析", "バックテスト"], index=0)
+    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較", "ランキング", "ウォッチリスト", "ポートフォリオ", "配当カレンダー", "アラート", "セクター分析", "バックテスト", "スクリーニング"], index=0)
     st.divider()
     st.header("⚙️ 分析設定")
     style = st.selectbox("投資スタイル", ["バランス", "バリュー投資", "グロース投資", "高配当投資", "安定性重視"])
@@ -1326,6 +1326,153 @@ if page == "バックテスト":
 
     st.divider()
     st.caption("⚠️ 本ツールは投資助言ではありません。過去の実績は将来の結果を保証しません。")
+    st.stop()
+
+# ========================================
+# スクリーニングページ
+# ========================================
+if page == "スクリーニング":
+    st.title("🔎 スクリーニング")
+    st.caption("条件を設定して銘柄を絞り込み")
+
+    # 条件設定
+    st.subheader("⚙️ スクリーニング条件")
+
+    sc_col1, sc_col2 = st.columns(2)
+    with sc_col1:
+        min_score = st.slider("総合スコア（最低）", 0, 100, 60, 5)
+        min_roe = st.slider("ROE（最低 %）", 0.0, 30.0, 5.0, 1.0)
+        min_dividend = st.slider("配当利回り（最低 %）", 0.0, 10.0, 0.0, 0.5)
+        max_per = st.slider("PER（最大 倍）", 0.0, 100.0, 50.0, 5.0)
+    with sc_col2:
+        min_prof = st.slider("収益性スコア（最低）", 0, 100, 0, 10)
+        min_safe = st.slider("安全性スコア（最低）", 0, 100, 0, 10)
+        min_grow = st.slider("成長性スコア（最低）", 0, 100, 0, 10)
+        min_val = st.slider("割安度スコア（最低）", 0, 100, 0, 10)
+
+    # 対象銘柄
+    major_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'major_stocks.json')
+    if not os.path.exists(major_path):
+        major_path = os.path.join(os.getcwd(), 'config', 'major_stocks.json')
+    major_stocks = {}
+    if os.path.exists(major_path):
+        with open(major_path, 'r', encoding='utf-8') as f:
+            major_stocks = json.load(f)
+
+    sc_count = st.selectbox("対象銘柄数", ["上位30銘柄（速い）", "上位50銘柄", "全100銘柄（時間かかる）"], index=0)
+    count_map = {"上位30銘柄（速い）": 30, "上位50銘柄": 50, "全100銘柄（時間かかる）": 100}
+    target = dict(list(major_stocks.items())[:count_map[sc_count]])
+
+    if st.button("🔍 スクリーニング実行", type="primary"):
+        import plotly.graph_objects as go
+        import pandas as pd
+        API_KEY = os.getenv("EDINET_API_KEY")
+        all_results = []
+        matched = []
+
+        progress = st.progress(0, text="分析中...")
+        total = len(target)
+        for idx_s, (code, name) in enumerate(target.items()):
+            progress.progress((idx_s+1)/total, text=f"{name}（{code}）を分析中... ({idx_s+1}/{total})")
+            if code not in CODE_MAP:
+                continue
+            try:
+                r = analyze_company(code, API_KEY)
+                if r:
+                    stock = {
+                        "code": code, "name": r["name"],
+                        "total": r["score"]["total_score"],
+                        "prof": r["score"]["category_scores"].get("収益性", 0),
+                        "safe": r["score"]["category_scores"].get("安全性", 0),
+                        "grow": r["score"]["category_scores"].get("成長性", 0),
+                        "val": r["score"]["category_scores"].get("割安度", 0),
+                        "roe": r["indicators"].get("ROE", 0),
+                        "per": r["indicators"].get("PER", 0),
+                        "dividend": r["indicators"].get("配当利回り", 0),
+                        "pbr": r["indicators"].get("PBR", 0),
+                        "margin": r["indicators"].get("営業利益率", 0),
+                    }
+                    all_results.append(stock)
+
+                    # フィルタリング
+                    if (stock["total"] >= min_score and
+                        stock["roe"] >= min_roe and
+                        stock["dividend"] >= min_dividend and
+                        (stock["per"] <= max_per or stock["per"] == 0) and
+                        stock["prof"] >= min_prof and
+                        stock["safe"] >= min_safe and
+                        stock["grow"] >= min_grow and
+                        stock["val"] >= min_val):
+                        matched.append(stock)
+            except:
+                continue
+        progress.empty()
+
+        st.divider()
+        st.subheader(f"📊 結果: {len(matched)}件ヒット（{len(all_results)}銘柄中）")
+
+        if matched:
+            matched.sort(key=lambda x: x["total"], reverse=True)
+
+            # 結果テーブル
+            df = pd.DataFrame(matched)
+            df = df[["code","name","total","prof","safe","grow","val","roe","per","dividend","pbr","margin"]]
+            df.columns = ["コード","企業名","総合","収益性","安全性","成長性","割安度","ROE","PER","配当利回り","PBR","営業利益率"]
+            st.dataframe(df, use_container_width=True, hide_index=True)
+
+            # TOP銘柄のレーダー比較
+            if len(matched) >= 2:
+                st.subheader("📊 上位銘柄の比較")
+                fig_sc = go.Figure()
+                colors = ["#2E75B6","#E74C3C","#2ECC71","#F39C12","#9B59B6"]
+                for i, s in enumerate(matched[:5]):
+                    cats = ["収益性","安全性","成長性","割安度"]
+                    vals = [s["prof"], s["safe"], s["grow"], s["val"]]
+                    fig_sc.add_trace(go.Scatterpolar(
+                        r=vals+[vals[0]], theta=cats+[cats[0]],
+                        fill="toself", name=f"{s['name'][:8]}({s['total']}点)",
+                        line_color=colors[i%5],
+                    ))
+                fig_sc.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100])), height=450, legend=dict(orientation="h", y=-0.15))
+                st.plotly_chart(fig_sc, use_container_width=True)
+
+            # 散布図（ROE vs PER）
+            st.subheader("📈 ROE × PER マップ")
+            fig_scatter = go.Figure()
+            fig_scatter.add_trace(go.Scatter(
+                x=[s["per"] for s in matched],
+                y=[s["roe"] for s in matched],
+                mode="markers+text",
+                text=[s["name"][:6] for s in matched],
+                textposition="top center",
+                marker=dict(
+                    size=[max(s["total"]/5, 5) for s in matched],
+                    color=[s["total"] for s in matched],
+                    colorscale="Blues", showscale=True,
+                    colorbar=dict(title="スコア"),
+                ),
+            ))
+            fig_scatter.update_layout(height=450, xaxis_title="PER（倍）", yaxis_title="ROE（%）")
+            fig_scatter.add_hline(y=10, line_dash="dash", line_color="gray", annotation_text="ROE 10%")
+            fig_scatter.add_vline(x=15, line_dash="dash", line_color="gray", annotation_text="PER 15倍")
+            st.plotly_chart(fig_scatter, use_container_width=True)
+
+            # ウォッチリスト一括追加
+            st.divider()
+            if st.button("⭐ ヒット銘柄をウォッチリストに追加"):
+                if "watchlist" not in st.session_state:
+                    st.session_state.watchlist = []
+                added = 0
+                for s in matched:
+                    if s["code"] not in st.session_state.watchlist:
+                        st.session_state.watchlist.append(s["code"])
+                        added += 1
+                st.success(f"✅ {added}銘柄をウォッチリストに追加しました")
+        else:
+            st.warning("条件に合う銘柄が見つかりませんでした。条件を緩めてみてください。")
+
+    st.divider()
+    st.caption("⚠️ 本ツールは投資助言ではありません。")
     st.stop()
 
 # ========================================
