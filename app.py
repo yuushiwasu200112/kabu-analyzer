@@ -2441,4 +2441,4 @@ if stock_code:
                         cols[i].metric(n, f"{v:,.0f}{u}" if u == "円" else f"{v:.2f}{u}")
 
 st.divider()
-st.caption("⚠️ 本ツールは投資助言ではありません。投資判断はご自身の責任で行ってください。")
+st.markdown("<p style="color:#666;font-size:0.8rem;text-align:center">⚠️ 本ツールは投資助言ではありません。投資判断はご自身の責任で行ってください。| <a href="#" onclick="return false;" style="color:#2E75B6">📜 利用規約</a></p>", unsafe_allow_html=True)
