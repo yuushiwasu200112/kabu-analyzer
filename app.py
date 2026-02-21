@@ -139,7 +139,7 @@ st.markdown("""
 
 # ── サイドバー ──
 with st.sidebar:
-    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較", "ランキング", "ウォッチリスト", "ポートフォリオ", "配当カレンダー", "アラート", "セクター分析", "バックテスト", "スクリーニング", "買い増し最適化", "定期レポート", "利用規約"], index=0)
+    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較", "ランキング", "ウォッチリスト", "ポートフォリオ", "配当カレンダー", "アラート", "セクター分析", "バックテスト", "スクリーニング", "買い増し最適化", "定期レポート", "利用規約", "設定", "プロフィール"], index=0)
     st.divider()
     st.header("⚙️ 分析設定")
     style = st.selectbox("投資スタイル", ["バランス", "バリュー投資", "グロース投資", "高配当投資", "安定性重視"])
@@ -2123,6 +2123,68 @@ if page == "定期レポート":
 # ========================================
 # 利用規約ページ
 # ========================================
+if page == "設定":
+    st.title("⚙️ 設定")
+    username = st.session_state.get("username", "guest")
+    plan = st.session_state.get("plan", "free")
+    plan_names = {"free": "🆓 Free", "pro": "⭐ Pro", "premium": "💎 Premium"}
+    ac1, ac2 = st.columns(2)
+    ac1.metric("ユーザー名", username)
+    ac2.metric("プラン", plan_names.get(plan, plan))
+    st.divider()
+    st.subheader("🗄️ データ管理")
+    dc1, dc2 = st.columns(2)
+    with dc1:
+        if st.button("🗑️ ウォッチリストをクリア"):
+            st.session_state.watchlist = []
+            st.success("✅ クリアしました")
+    with dc2:
+        if st.button("🗑️ ポートフォリオをクリア"):
+            st.session_state.portfolio = []
+            st.success("✅ クリアしました")
+    st.divider()
+    st.subheader("🔄 キャッシュ")
+    if st.button("🔄 キャッシュをクリア"):
+        st.cache_data.clear()
+        st.success("✅ クリアしました")
+    st.divider()
+    st.markdown("ℹ️ v1.0.0 | 3,732社対応 | 300銘柄ランキング | 15セクター | 33テスト")
+    st.stop()
+
+if page == "プロフィール":
+    st.title("👤 マイプロフィール")
+    username = st.session_state.get("username", "guest")
+    plan = st.session_state.get("plan", "free")
+    plan_info = {"free": ("🆓 Free", "#8899AA"), "pro": ("⭐ Pro", "#F39C12"), "premium": ("💎 Premium", "#2E75B6")}
+    p_name, p_color = plan_info.get(plan, ("Free", "#8899AA"))
+    st.markdown(f"""<div style='background:linear-gradient(135deg,#1B3A5C,#2E75B6);border-radius:16px;padding:30px;text-align:center;margin-bottom:20px'>
+        <div style='font-size:3rem;margin-bottom:10px'>👤</div>
+        <h2 style='color:white;margin:0'>{username}</h2>
+        <span style='background:{p_color};color:white;padding:4px 16px;border-radius:20px;font-size:0.85rem'>{p_name}</span>
+    </div>""", unsafe_allow_html=True)
+    try:
+        from data.database import get_user_stats, get_analysis_history
+        stats = get_user_stats(username)
+        sc1, sc2, sc3 = st.columns(3)
+        sc1.metric("累計分析", f"{stats['total_analyses']}回")
+        sc2.metric("分析銘柄数", f"{stats['unique_stocks']}銘柄")
+        sc3.metric("ウォッチリスト", f"{len(st.session_state.get('watchlist',[]))}銘柄")
+        if stats["top_stocks"]:
+            st.divider()
+            st.subheader("📈 よく分析する銘柄")
+            for ts in stats["top_stocks"][:5]:
+                st.caption(f"🔹 {ts['company_name']}（{ts['stock_code']}）: {ts['cnt']}回")
+        history = get_analysis_history(username, limit=10)
+        if history:
+            st.divider()
+            st.subheader("📜 分析履歴")
+            for h in history:
+                sc = "🟢" if h["total_score"] >= 75 else "🟡" if h["total_score"] >= 50 else "🔴"
+                st.caption(f"{sc} {h['company_name']}({h['stock_code']}) {h['total_score']}点 - {h['analyzed_at'][:16]}")
+    except:
+        st.info("📌 分析を行うと統計情報が表示されます")
+    st.stop()
+
 if page == "利用規約":
     st.title("📜 利用規約")
     st.caption("最終更新日: 2026年2月22日")
@@ -2195,6 +2257,10 @@ Kabu Analyzer（以下「本サービス」）は、日本株式の財務デー�
 
 # ========================================
 # 銘柄分析ページ
+
+# ── 利用規約等は先に処理済みなのでここで停止 ──
+if page in ["利用規約", "設定", "プロフィール"]:
+    st.stop()
 
 # ── ダッシュボード ──
 st.markdown("""
