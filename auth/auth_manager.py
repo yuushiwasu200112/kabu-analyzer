@@ -197,14 +197,26 @@ def show_login_page():
     st.divider()
     st.subheader("📋 プラン一覧")
     plan_cols = st.columns(3)
-    for i, (key, plan) in enumerate(PLANS.items()):
-        with plan_cols[i]:
-            st.markdown(f"### {plan['name']}")
-            if plan['price'] == 0:
-                st.markdown("**無料**")
-            else:
-                st.markdown(f"**¥{plan['price']:,}/月**")
-            limit = plan['monthly_analyses']
-            st.markdown(f"月{limit}回分析" if limit > 0 else "無制限")
-            for f in plan['features']:
-                st.caption(f"✅ {f}")
+    with plan_cols[0]:
+        st.markdown("### 🆓 Free")
+        st.markdown("**無料**")
+        st.markdown("月5回分析")
+        st.caption("✅ 銘柄分析")
+        st.caption("✅ 複数社比較")
+    with plan_cols[1]:
+        st.markdown("### ⭐ Pro")
+        st.markdown("**¥980/月**")
+        st.markdown("月50回分析")
+        st.caption("✅ 全機能利用可能")
+        st.caption("✅ ランキング・スクリーニング")
+        st.caption("✅ ポートフォリオ分析")
+        st.caption("✅ PDFレポート")
+        st.link_button("⭐ Proに登録", "https://buy.stripe.com/test_aFa5kD3JK9mY3tYbRBa3u00", type="primary", use_container_width=True)
+    with plan_cols[2]:
+        st.markdown("### 💎 Premium")
+        st.markdown("**¥2,980/月**")
+        st.markdown("無制限分析")
+        st.caption("✅ 全機能 + AI定性分析")
+        st.caption("✅ アラート・バックテスト")
+        st.caption("✅ 優先サポート")
+        st.link_button("💎 Premiumに登録", "https://buy.stripe.com/test_eVq9ATbcc56I6Ga2h1a3u01", type="primary", use_container_width=True)
