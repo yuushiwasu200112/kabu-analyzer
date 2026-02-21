@@ -136,9 +136,11 @@ def check_usage_limit(username):
 def show_login_page():
     """ログイン/登録ページを表示"""
     st.markdown("""
-    <div class='main-header'>
-        <h1>📊 Kabu Analyzer</h1>
-        <p>AI搭載 株式投資分析ツール</p>
+    <div style='text-align:center;padding:40px 0 20px 0;background:linear-gradient(135deg,#0E1117,#1B3A5C);border-radius:16px;margin-bottom:20px'>
+        <div style='font-size:3.5rem;margin-bottom:10px'>📊</div>
+        <h1 style='font-size:2.2rem;background:linear-gradient(90deg,#2E75B6,#5BA3E6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:5px'>Kabu Analyzer</h1>
+        <p style='color:#8899AA;font-size:1rem'>AI搭載 株式投資分析ツール</p>
+        <div style='width:60px;height:3px;background:linear-gradient(90deg,#2E75B6,#5BA3E6);margin:15px auto;border-radius:2px'></div>
     </div>
     """, unsafe_allow_html=True)
 
