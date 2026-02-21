@@ -164,6 +164,13 @@ with st.sidebar:
             st.caption(f"今月の分析: {usage}/{limit}回")
             st.progress(min(usage / limit, 1.0))
 
+    user_plan = user_info.get("plan", "free")
+    if user_plan == "free" and username != "guest":
+        st.divider()
+        st.markdown("**🚀 アップグレード**")
+        st.link_button("⭐ Pro ¥980/月", "https://buy.stripe.com/test_aFa5kD3JK9mY3tYbRBa3u00", use_container_width=True)
+        st.link_button("💎 Premium ¥2,980/月", "https://buy.stripe.com/test_eVq9ATbcc56I6Ga2h1a3u01", use_container_width=True)
+
     if st.button("🚪 ログアウト"):
         st.session_state.logged_in = False
         st.session_state.username = None
@@ -1538,6 +1545,14 @@ if stock_code:
             can_use, usage, limit = check_usage_limit(username)
         if not can_use:
             st.error(f"❌ 今月の分析回数上限（{limit}回）に達しました。")
+            st.markdown("### 🚀 プランをアップグレードして分析を続けましょう")
+            up_col1, up_col2 = st.columns(2)
+            with up_col1:
+                st.markdown("**⭐ Pro** ¥980/月（月50回）")
+                st.link_button("⭐ Proに登録", "https://buy.stripe.com/test_aFa5kD3JK9mY3tYbRBa3u00", type="primary")
+            with up_col2:
+                st.markdown("**💎 Premium** ¥2,980/月（無制限）")
+                st.link_button("💎 Premiumに登録", "https://buy.stripe.com/test_eVq9ATbcc56I6Ga2h1a3u01", type="primary")
             st.stop()
 
         with st.spinner("分析データを取得中..."):
