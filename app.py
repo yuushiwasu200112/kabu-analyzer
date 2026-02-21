@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import json
+import datetime
 from dotenv import load_dotenv
 
 try:
@@ -121,7 +122,7 @@ st.markdown("""
 
 # ── サイドバー ──
 with st.sidebar:
-    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較"], index=0)
+    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較", "ランキング"], index=0)
     st.divider()
     st.header("⚙️ 分析設定")
     style = st.selectbox("投資スタイル", ["バランス", "バリュー投資", "グロース投資", "高配当投資", "安定性重視"])
@@ -285,6 +286,114 @@ if page == "複数社比較":
     st.stop()
 
 # ========================================
+# ランキングページ
+# ========================================
+if page == "ランキング":
+    st.title("🏆 銘柄ランキング")
+    st.caption(f"投資スタイル: {style} ｜ 投資期間: {period}")
+
+    # 主要銘柄リスト読み込み
+    major_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'major_stocks.json')
+    if not os.path.exists(major_path):
+        major_path = os.path.join(os.getcwd(), 'config', 'major_stocks.json')
+    major_stocks = {}
+    if os.path.exists(major_path):
+        with open(major_path, 'r', encoding='utf-8') as f:
+            major_stocks = json.load(f)
+
+    st.markdown(f"**対象: 主要{len(major_stocks)}銘柄**")
+
+    if st.button("🔍 ランキングを生成", type="primary"):
+        API_KEY = os.getenv("EDINET_API_KEY")
+        rankings = []
+        progress = st.progress(0, text="分析中...")
+        total = len(major_stocks)
+
+        for idx, (code, name) in enumerate(major_stocks.items()):
+            progress.progress((idx + 1) / total, text=f"{name}（{code}）を分析中... ({idx+1}/{total})")
+            if code not in CODE_MAP:
+                continue
+            try:
+                r = analyze_company(code, API_KEY)
+                if r:
+                    rankings.append({
+                        "code": code,
+                        "name": r["name"],
+                        "total": r["score"]["total_score"],
+                        "profitability": r["score"]["category_scores"].get("収益性", 0),
+                        "safety": r["score"]["category_scores"].get("安全性", 0),
+                        "growth": r["score"]["category_scores"].get("成長性", 0),
+                        "value": r["score"]["category_scores"].get("割安度", 0),
+                        "roe": r["indicators"].get("ROE", 0),
+                        "per": r["indicators"].get("PER", 0),
+                        "dividend": r["indicators"].get("配当利回り", 0),
+                    })
+            except:
+                continue
+
+        progress.empty()
+
+        if rankings:
+            import pandas as pd
+            import plotly.graph_objects as go
+
+            # スコア順にソート
+            rankings.sort(key=lambda x: x["total"], reverse=True)
+
+            # 上位表示
+            st.subheader("🥇 総合スコア TOP10")
+            for i, r in enumerate(rankings[:10]):
+                score = r["total"]
+                color = "🟢" if score >= 75 else "🟡" if score >= 50 else "🔴"
+                medal = ["🥇", "🥈", "🥉"][i] if i < 3 else f"{i+1}位"
+                st.markdown(f"{medal} **{r['name']}**（{r['code']}）: {color} **{score}点** ｜ 収益性{r['profitability']} / 安全性{r['safety']} / 成長性{r['growth']} / 割安度{r['value']}")
+
+            st.divider()
+
+            # 全銘柄テーブル
+            st.subheader("📊 全銘柄スコア一覧")
+            df = pd.DataFrame(rankings)
+            df.columns = ["証券コード", "企業名", "総合スコア", "収益性", "安全性", "成長性", "割安度", "ROE", "PER", "配当利回り"]
+            df["順位"] = range(1, len(df) + 1)
+            df = df[["順位", "証券コード", "企業名", "総合スコア", "収益性", "安全性", "成長性", "割安度", "ROE", "PER", "配当利回り"]]
+            st.dataframe(df, use_container_width=True, hide_index=True)
+
+            # カテゴリ別TOP5
+            st.divider()
+            cat_cols = st.columns(4)
+            categories_rank = [
+                ("収益性", "profitability"),
+                ("安全性", "safety"),
+                ("成長性", "growth"),
+                ("割安度", "value"),
+            ]
+            for i, (cat_name, cat_key) in enumerate(categories_rank):
+                with cat_cols[i]:
+                    st.markdown(f"**{cat_name} TOP5**")
+                    sorted_cat = sorted(rankings, key=lambda x: x[cat_key], reverse=True)
+                    for j, r in enumerate(sorted_cat[:5]):
+                        st.caption(f"{j+1}. {r['name']} ({r[cat_key]}点)")
+
+            # バーチャート
+            st.divider()
+            st.subheader("📈 スコア分布")
+            fig_bar = go.Figure(data=[
+                go.Bar(
+                    x=[r["name"][:6] for r in rankings[:15]],
+                    y=[r["total"] for r in rankings[:15]],
+                    marker_color=["#27AE60" if r["total"] >= 75 else "#F39C12" if r["total"] >= 50 else "#E74C3C" for r in rankings[:15]],
+                )
+            ])
+            fig_bar.update_layout(height=400, xaxis_title="銘柄", yaxis_title="総合スコア", yaxis_range=[0, 100])
+            st.plotly_chart(fig_bar, use_container_width=True)
+        else:
+            st.error("❌ ランキングデータを取得できませんでした")
+
+    st.divider()
+    st.caption("⚠️ 本ツールは投資助言ではありません。")
+    st.stop()
+
+# ========================================
 # 銘柄分析ページ
 # ========================================
 st.markdown("""
@@ -372,6 +481,21 @@ if stock_code:
                 st.subheader("📊 カテゴリ別スコア")
                 for cat, cs in score_result["category_scores"].items():
                     st.progress(cs / 100, text=f"{cat}: {cs}点")
+
+            # ── PDFレポート ──
+            from reports.pdf_report import generate_pdf
+            from analysis.filters import check_filters as cf2
+            pdf_warnings = cf2(result['current'], result['previous'])
+            pdf_bytes = generate_pdf(
+                company_name, stock_code, indicators, score_result,
+                warnings=pdf_warnings, stock_info=stock_info,
+            )
+            st.download_button(
+                label="📄 PDFレポートをダウンロード",
+                data=pdf_bytes,
+                file_name=f"kabu_analyzer_{stock_code}_{datetime.datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+            )
 
             st.divider()
             st.subheader("📉 主要指標の推移")
