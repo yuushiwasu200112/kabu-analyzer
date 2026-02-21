@@ -1598,7 +1598,8 @@ if st.session_state.get("alert_history"):
 
 st.divider()
 
-stock_code = st.text_input("🔍 証券コードまたは企業名を入力（例: 7203 / トヨタ）", key="main_input")
+if not (qc1_pick or qc2_pick or qc3_pick):
+    stock_code = st.text_input("🔍 証券コードまたは企業名を入力（例: 7203 / トヨタ）", key="main_input")
 
 if stock_code and not stock_code.isdigit():
     matches = {k: v for k, v in CODE_MAP.items() if stock_code in v["name"]}
