@@ -221,6 +221,25 @@ def _load_major_stocks():
     return {}
 
 @st.cache_data(ttl=3600, show_spinner=False)
+def analyze_company_safe(code, api_key, style="バランス", period="中期（1〜3年）"):
+    """エラーハンドリング付きの分析ラッパー"""
+    try:
+        return analyze_company(code, api_key, style, period)
+    except ConnectionError:
+        return {"error": "ネットワークエラー: インターネット接続を確認してください"}
+    except TimeoutError:
+        return {"error": "タイムアウト: EDINET APIの応答に時間がかかっています。しばらくしてから再度お試しください"}
+    except Exception as e:
+        error_msg = str(e)
+        if "Rate Limit" in error_msg or "429" in error_msg:
+            return {"error": "API制限: リクエスト上限に達しました。1分ほどお待ちください"}
+        elif "404" in error_msg:
+            return {"error": "データなし: この銘柄の有価証券報告書が見つかりません"}
+        elif "EDINET" in error_msg:
+            return {"error": "EDINET APIエラー: 金融庁のシステムが一時的に利用できません"}
+        return {"error": f"分析エラー: {error_msg[:100]}"}
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def analyze_company(code, api_key):
     from data_sources.stock_client import get_stock_info
     from data_sources.cache_manager import get_cache, set_cache
@@ -1560,7 +1579,7 @@ if page == "買い増し最適化":
                 })
                 st.rerun()
             elif bh_code:
-                st.error("❌ 未対応の証券コード")
+                st.error("❌ 未対応の証券コードです。4桁の証券コードを入力してください。")
 
     # ウォッチリストから追加
     if st.session_state.get("watchlist"):
@@ -2427,7 +2446,7 @@ if stock_code:
                     fig_c.update_layout(height=400, xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig_c, use_container_width=True)
                 else: st.info("ℹ️ 株価チャートを取得できませんでした")
-            except: st.info("ℹ️ 株価チャートは一時的に利用できません（Rate Limit）")
+            except: st.warning("⏳ 株価データの取得に制限がかかっています。1分ほどお待ちいただくと表示されます。")
 
             st.divider()
             st.subheader("📋 財務指標一覧")
