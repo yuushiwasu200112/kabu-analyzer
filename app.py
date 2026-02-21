@@ -43,6 +43,7 @@ INDICATOR_FORMAT = {
 
 # ── 認証チェック ──
 from auth.auth_manager import show_login_page, check_usage_limit, update_usage, PLANS
+from data.database import save_analysis, get_analysis_history, get_user_stats, init_db
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -1550,6 +1551,20 @@ qc1.info("💡 **人気** トヨタ(7203) / ソニー(6758)")
 qc2.info("📈 **高配当** JT(2914) / 三菱商事(8058)")
 qc3.info("🚀 **成長** 東京エレクトロン(8035)")
 
+username = st.session_state.get("username", "guest")
+if username != "guest":
+    try:
+        history = get_analysis_history(username, limit=5)
+        if history:
+            st.markdown("**📜 最近の分析**")
+            for h in history:
+                sc = "🟢" if h["total_score"] >= 75 else "🟡" if h["total_score"] >= 50 else "🔴"
+                st.caption(f"{sc} {h['company_name']}({h['stock_code']}) {h['total_score']}点 - {h['analyzed_at'][:16]}")
+        stats = get_user_stats(username)
+        if stats["total_analyses"] > 0:
+            st.markdown(f"**📊 累計{stats['total_analyses']}回分析 / {stats['unique_stocks']}銘柄**")
+    except: pass
+
 if st.session_state.get("alert_history"):
     st.markdown("**🔔 最近のアラート**")
     for h in list(reversed(st.session_state.get("alert_history", [])))[:3]:
@@ -1614,6 +1629,14 @@ if stock_code:
             stock_info = result["stock_info"]
             indicators = result["indicators"]
             score_result = result["score"]
+
+            # 分析履歴をDBに保存
+            try:
+                save_analysis(
+                    st.session_state.get("username", "guest"),
+                    stock_code, company_name, score_result, indicators, style, period
+                )
+            except: pass
 
             if stock_info and stock_info["current_price"] > 0:
                 c1, c2, c3, c4 = st.columns(4)
