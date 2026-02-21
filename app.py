@@ -1723,6 +1723,24 @@ if stock_code:
             else:
                 st.info("⭐ ウォッチリスト登録済み")
 
+            # SNSシェア
+            cats = score_result["category_scores"]
+            share_text = f"{company_name}({stock_code})の投資スコア: {score}点
+収益性{cats.get('収益性',0)} / 安全性{cats.get('安全性',0)} / 成長性{cats.get('成長性',0)} / 割安度{cats.get('割安度',0)}
+#KabuAnalyzer #株式投資 #投資分析"
+            import urllib.parse
+            tweet_url = f"https://twitter.com/intent/tweet?text={urllib.parse.quote(share_text)}&url=https://kabu-analyzer.streamlit.app/"
+            line_url = f"https://social-plugins.line.me/lineit/share?url=https://kabu-analyzer.streamlit.app/&text={urllib.parse.quote(share_text)}"
+
+            st.divider()
+            share_col1, share_col2, share_col3 = st.columns(3)
+            with share_col1:
+                st.link_button("🐦 Xでシェア", tweet_url, use_container_width=True)
+            with share_col2:
+                st.link_button("💬 LINEでシェア", line_url, use_container_width=True)
+            with share_col3:
+                st.code(f"{company_name}({stock_code}) {score}点", language=None)
+
             import datetime as dt_mod
             from reports.pdf_report import generate_pdf
             from analysis.filters import check_filters as cf2
