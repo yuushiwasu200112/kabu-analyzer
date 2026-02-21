@@ -1558,9 +1558,24 @@ for col, icon, label, val, color in [
 
 st.write("")
 qc1, qc2, qc3 = st.columns(3)
-qc1.info("💡 **人気** トヨタ(7203) / ソニー(6758)")
-qc2.info("📈 **高配当** JT(2914) / 三菱商事(8058)")
-qc3.info("🚀 **成長** 東京エレクトロン(8035)")
+with qc1:
+    st.markdown("""<div style='background:linear-gradient(135deg,#1B3A5C,#2E75B6);border-radius:10px;padding:15px;cursor:pointer'>
+    <p style='color:white;margin:0;font-size:1rem'>💡 人気銘柄</p>
+    <p style='color:#B8D4E8;margin:5px 0 0 0;font-size:0.85rem'>トヨタ / ソニー / KDDI</p></div>""", unsafe_allow_html=True)
+    qc1_pick = st.selectbox("分析する", ["","7203 トヨタ","6758 ソニー","9433 KDDI"], key="qc1_pick", label_visibility="collapsed")
+with qc2:
+    st.markdown("""<div style='background:linear-gradient(135deg,#1B4332,#27AE60);border-radius:10px;padding:15px;cursor:pointer'>
+    <p style='color:white;margin:0;font-size:1rem'>📈 高配当銘柄</p>
+    <p style='color:#B8E8D4;margin:5px 0 0 0;font-size:0.85rem'>JT / 三菱商事 / KDDI</p></div>""", unsafe_allow_html=True)
+    qc2_pick = st.selectbox("分析する", ["","2914 JT","8058 三菱商事","9433 KDDI"], key="qc2_pick", label_visibility="collapsed")
+with qc3:
+    st.markdown("""<div style='background:linear-gradient(135deg,#4A1942,#9B59B6);border-radius:10px;padding:15px;cursor:pointer'>
+    <p style='color:white;margin:0;font-size:1rem'>🚀 成長銘柄</p>
+    <p style='color:#E8B8E8;margin:5px 0 0 0;font-size:0.85rem'>東京エレクトロン / レーザーテック</p></div>""", unsafe_allow_html=True)
+    qc3_pick = st.selectbox("分析する", ["","8035 東京エレクトロン","6920 レーザーテック"], key="qc3_pick", label_visibility="collapsed")
+quick_pick = qc1_pick or qc2_pick or qc3_pick
+if quick_pick:
+    st.session_state.quick_code = quick_pick.split(" ")[0]
 
 username = st.session_state.get("username", "guest")
 if username != "guest":
