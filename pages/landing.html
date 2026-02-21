@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kabu Analyzer - AI搭載 株式投資分析ツール</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0E1117;color:#FAFAFA}
+.hero{background:linear-gradient(135deg,#0E1117,#1B3A5C,#2E75B6);padding:80px 20px;text-align:center;min-height:90vh;display:flex;flex-direction:column;justify-content:center}
+.hero h1{font-size:3.5rem;margin-bottom:20px}.hero p{font-size:1.3rem;color:#B8D4E8;margin-bottom:40px;max-width:700px;margin-left:auto;margin-right:auto}
+.cta-btn{display:inline-block;background:#2E75B6;color:white;padding:16px 40px;border-radius:8px;text-decoration:none;font-size:1.2rem;font-weight:bold;margin:10px;transition:all .3s}
+.cta-btn:hover{background:#3A8DD4;transform:translateY(-2px);box-shadow:0 8px 25px rgba(46,117,182,.4)}.cta-btn.secondary{background:transparent;border:2px solid #2E75B6}
+.stats{display:flex;justify-content:center;gap:60px;margin-top:60px;flex-wrap:wrap}.stat{text-align:center}.stat-num{font-size:2.5rem;font-weight:bold;color:#2E75B6}.stat-label{color:#8899AA;margin-top:5px}
+.features{padding:80px 20px;max-width:1200px;margin:0 auto}.features h2{text-align:center;font-size:2.2rem;margin-bottom:60px}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:30px}
+.feature-card{background:#1B2332;border-radius:12px;padding:30px;border:1px solid #2a3a4a;transition:all .3s}
+.feature-card:hover{border-color:#2E75B6;transform:translateY(-5px);box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.feature-icon{font-size:2.5rem;margin-bottom:15px}.feature-card h3{font-size:1.3rem;margin-bottom:10px}.feature-card p{color:#8899AA;line-height:1.6}
+.pricing{padding:80px 20px;background:#141922}.pricing h2{text-align:center;font-size:2.2rem;margin-bottom:60px}
+.pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:30px;max-width:1000px;margin:0 auto}
+.pricing-card{background:#1B2332;border-radius:12px;padding:40px 30px;text-align:center;border:1px solid #2a3a4a}
+.pricing-card.popular{border-color:#2E75B6;position:relative}.pricing-card.popular::before{content:"人気No.1";position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#2E75B6;color:white;padding:4px 20px;border-radius:20px;font-size:.85rem}
+.pricing-card h3{font-size:1.5rem;margin-bottom:10px}.price{font-size:2.5rem;font-weight:bold;margin:20px 0}.price span{font-size:1rem;color:#8899AA}
+.pricing-features{text-align:left;margin:20px 0}.pricing-features li{list-style:none;padding:8px 0;color:#B8D4E8}.pricing-features li::before{content:"✅ "}
+footer{text-align:center;padding:40px 20px;color:#666;border-top:1px solid #2a3a4a}footer a{color:#2E75B6;text-decoration:none}
+@media(max-width:768px){.hero h1{font-size:2rem}.hero p{font-size:1rem}.stats{gap:30px}.stat-num{font-size:1.8rem}}
+</style>
+</head>
+<body>
+<section class="hero">
+<h1>📊 Kabu Analyzer</h1>
+<p>AI搭載の株式投資分析ツール。3,700社以上の日本株をワンクリックでスコアリング。投資判断を、もっとスマートに。</p>
+<div><a href="https://kabu-analyzer.streamlit.app/" class="cta-btn">🚀 無料で始める</a><a href="#pricing" class="cta-btn secondary">💎 プランを見る</a></div>
+<div class="stats"><div class="stat"><div class="stat-num">3,732</div><div class="stat-label">対応銘柄</div></div><div class="stat"><div class="stat-num">300+</div><div class="stat-label">ランキング対象</div></div><div class="stat"><div class="stat-num">15</div><div class="stat-label">セクター分析</div></div><div class="stat"><div class="stat-num">10+</div><div class="stat-label">分析機能</div></div></div>
+</section>
+<section class="features"><h2>🎯 主な機能</h2>
+<div class="feature-grid">
+<div class="feature-card"><div class="feature-icon">📊</div><h3>銘柄分析</h3><p>EDINETの有報から収益性・安全性・成長性・割安度を自動算出。投資スタイル×期間でスコアを最適化。</p></div>
+<div class="feature-card"><div class="feature-icon">🏆</div><h3>ランキング</h3><p>300銘柄を一括分析してスコア順にランキング。カテゴリ別TOP5も一目瞭然。</p></div>
+<div class="feature-card"><div class="feature-icon">🔎</div><h3>スクリーニング</h3><p>ROE、PER、配当利回りなど8条件で絞り込み。ROE×PERマップで割安成長株を発見。</p></div>
+<div class="feature-card"><div class="feature-icon">💼</div><h3>ポートフォリオ分析</h3><p>保有銘柄の構成比・リスク分散を可視化。加重平均スコアで全体の健全性をチェック。</p></div>
+<div class="feature-card"><div class="feature-icon">📅</div><h3>配当カレンダー</h3><p>銘柄の配当支払月を一覧表示。配当集中リスクも自動チェック。</p></div>
+<div class="feature-card"><div class="feature-icon">🔬</div><h3>バックテスト</h3><p>過去4年分のスコア推移と株価パフォーマンスを比較検証。</p></div>
+<div class="feature-card"><div class="feature-icon">🏭</div><h3>セクター分析</h3><p>15業種のスコアをレーダーチャートで比較。セクターローテーション戦略に。</p></div>
+<div class="feature-card"><div class="feature-icon">🔔</div><h3>アラート</h3><p>条件を設定してスコアや指標がしきい値に達したら通知。</p></div>
+<div class="feature-card"><div class="feature-icon">📄</div><h3>PDFレポート</h3><p>分析結果をプロフェッショナルなPDFレポートとして出力。</p></div>
+</div></section>
+<section class="pricing" id="pricing"><h2>💰 料金プラン</h2>
+<div class="pricing-grid">
+<div class="pricing-card"><h3>🆓 Free</h3><div class="price">¥0<span>/月</span></div><ul class="pricing-features"><li>月5回分析</li><li>銘柄分析</li><li>複数社比較</li></ul><a href="https://kabu-analyzer.streamlit.app/" class="cta-btn" style="width:100%">無料で始める</a></div>
+<div class="pricing-card popular"><h3>⭐ Pro</h3><div class="price">¥980<span>/月</span></div><ul class="pricing-features"><li>月50回分析</li><li>全機能利用可能</li><li>ランキング・スクリーニング</li><li>ポートフォリオ分析</li><li>PDFレポート・CSV出力</li></ul><a href="https://buy.stripe.com/test_aFa5kD3JK9mY3tYbRBa3u00" class="cta-btn" style="width:100%">Proに登録</a></div>
+<div class="pricing-card"><h3>💎 Premium</h3><div class="price">¥2,980<span>/月</span></div><ul class="pricing-features"><li>無制限分析</li><li>全機能 + AI定性分析</li><li>アラート・バックテスト</li><li>優先サポート</li></ul><a href="https://buy.stripe.com/test_eVq9ATbcc56I6Ga2h1a3u01" class="cta-btn" style="width:100%">Premiumに登録</a></div>
+</div></section>
+<footer><p>© 2026 Kabu Analyzer. All rights reserved. | <a href="https://kabu-analyzer.streamlit.app/">アプリを使う</a></p></footer>
+</body></html>
