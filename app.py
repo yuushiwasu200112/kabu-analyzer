@@ -1540,10 +1540,21 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 dash_col1, dash_col2, dash_col3, dash_col4 = st.columns(4)
-dash_col1.metric("対応銘柄", f"{len(CODE_MAP):,}社")
-dash_col2.metric("ウォッチリスト", f"{len(st.session_state.get('watchlist', []))}銘柄")
-dash_col3.metric("ポートフォリオ", f"{len(st.session_state.get('portfolio', []))}銘柄")
-dash_col4.metric("アラート", f"{len([a for a in st.session_state.get('alerts', []) if a.get('active')])}件")
+wl = len(st.session_state.get("watchlist", []))
+pf = len(st.session_state.get("portfolio", []))
+al = len([a for a in st.session_state.get("alerts", []) if a.get("active")])
+for col, icon, label, val, color in [
+    (dash_col1, "📊", "対応銘柄", f"{len(CODE_MAP):,}社", "#2E75B6"),
+    (dash_col2, "⭐", "ウォッチリスト", f"{wl}銘柄", "#F39C12"),
+    (dash_col3, "💼", "ポートフォリオ", f"{pf}銘柄", "#2ECC71"),
+    (dash_col4, "🔔", "アラート", f"{al}件", "#E74C3C"),
+]:
+    col.markdown(f"""
+    <div style='background:linear-gradient(135deg,#1B2332,#1E2A3E);border-radius:12px;padding:18px;text-align:center;border:1px solid {color}33;box-shadow:0 4px 15px rgba(0,0,0,0.2)'>
+        <div style='font-size:1.5rem'>{icon}</div>
+        <p style='color:#8899AA;margin:5px 0 2px 0;font-size:0.8rem'>{label}</p>
+        <p style='color:#FFFFFF;margin:0;font-size:1.6rem;font-weight:bold'>{val}</p>
+    </div>""", unsafe_allow_html=True)
 
 st.write("")
 qc1, qc2, qc3 = st.columns(3)
