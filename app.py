@@ -1575,7 +1575,7 @@ with qc3:
     qc3_pick = st.selectbox("分析する", ["","8035 東京エレクトロン","6920 レーザーテック"], key="qc3_pick", label_visibility="collapsed")
 quick_pick = qc1_pick or qc2_pick or qc3_pick
 if quick_pick:
-    st.session_state.quick_code = quick_pick.split(" ")[0]
+    stock_code = quick_pick.split(" ")[0]
 
 username = st.session_state.get("username", "guest")
 if username != "guest":
