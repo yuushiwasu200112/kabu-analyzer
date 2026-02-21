@@ -301,15 +301,25 @@ if page == "ランキング":
         with open(major_path, 'r', encoding='utf-8') as f:
             major_stocks = json.load(f)
 
-    st.markdown(f"**対象: 主要{len(major_stocks)}銘柄**")
+    rank_col1, rank_col2 = st.columns(2)
+    with rank_col1:
+        rank_count = st.selectbox("分析銘柄数", ["上位30銘柄（速い）", "上位50銘柄", "全100銘柄（時間かかる）"], index=0)
+    with rank_col2:
+        sort_by = st.selectbox("並び替え基準", ["総合スコア", "収益性", "安全性", "成長性", "割安度"], index=0)
+
+    count_map = {"上位30銘柄（速い）": 30, "上位50銘柄": 50, "全100銘柄（時間かかる）": 100}
+    max_count = count_map[rank_count]
+    target_stocks = dict(list(major_stocks.items())[:max_count])
+
+    st.markdown(f"**対象: {len(target_stocks)}銘柄**")
 
     if st.button("🔍 ランキングを生成", type="primary"):
         API_KEY = os.getenv("EDINET_API_KEY")
         rankings = []
         progress = st.progress(0, text="分析中...")
-        total = len(major_stocks)
+        total = len(target_stocks)
 
-        for idx, (code, name) in enumerate(major_stocks.items()):
+        for idx, (code, name) in enumerate(target_stocks.items()):
             progress.progress((idx + 1) / total, text=f"{name}（{code}）を分析中... ({idx+1}/{total})")
             if code not in CODE_MAP:
                 continue
@@ -337,8 +347,10 @@ if page == "ランキング":
             import pandas as pd
             import plotly.graph_objects as go
 
-            # スコア順にソート
-            rankings.sort(key=lambda x: x["total"], reverse=True)
+            # ソート基準に応じて並び替え
+            sort_key_map = {"総合スコア": "total", "収益性": "profitability", "安全性": "safety", "成長性": "growth", "割安度": "value"}
+            sort_k = sort_key_map.get(sort_by, "total")
+            rankings.sort(key=lambda x: x[sort_k], reverse=True)
 
             # 上位表示
             st.subheader("🥇 総合スコア TOP10")
