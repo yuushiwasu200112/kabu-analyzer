@@ -179,9 +179,12 @@ def show_login_page():
             new_email = st.text_input("メールアドレス", key="reg_email")
             new_password = st.text_input("パスワード（6文字以上）", type="password", key="reg_pass")
             new_password2 = st.text_input("パスワード（確認）", type="password", key="reg_pass2")
+            agree = st.checkbox("📜 利用規約に同意する（本サービスは投資助言ではありません）", key="reg_agree")
             reg_submitted = st.form_submit_button("登録", type="primary")
 
-            if reg_submitted:
+            if reg_submitted and not agree:
+                st.error("利用規約に同意してください")
+            elif reg_submitted:
                 if not new_username or not new_password or not new_email:
                     st.warning("すべての項目を入力してください")
                 elif len(new_password) < 6:
