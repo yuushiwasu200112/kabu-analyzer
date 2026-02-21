@@ -50,6 +50,11 @@ if not st.session_state.logged_in:
     show_login_page()
     st.stop()
 
+# ゲストの分析回数管理
+if st.session_state.get("username") == "guest":
+    if "guest_usage" not in st.session_state:
+        st.session_state.guest_usage = 0
+
 # ── カスタムCSS ──
 st.markdown("""
 <style>
@@ -147,7 +152,11 @@ with st.sidebar:
     plan_name = PLANS.get(user_info.get("plan", "free"), PLANS["free"])["name"]
     st.markdown(f"👤 **{username}** ({plan_name})")
 
-    if username != "guest":
+    if username == "guest":
+        g_usage = st.session_state.get("guest_usage", 0)
+        st.caption(f"今月の分析: {g_usage}/5回")
+        st.progress(min(g_usage / 5, 1.0))
+    else:
         can_use, usage, limit = check_usage_limit(username)
         if limit == -1:
             st.caption(f"今月の分析: {usage}回（無制限）")
@@ -884,8 +893,27 @@ if stock_code:
         st.success(f"✅ {company_name}（{stock_code}）を分析中...")
         API_KEY = os.getenv("EDINET_API_KEY")
 
+        # 使用制限チェック
+        username = st.session_state.get("username", "guest")
+        if username == "guest":
+            guest_usage = st.session_state.get("guest_usage", 0)
+            can_use = guest_usage < 5
+            usage = guest_usage
+            limit = 5
+        else:
+            can_use, usage, limit = check_usage_limit(username)
+        if not can_use:
+            st.error(f"❌ 今月の分析回数上限（{limit}回）に達しました。Proプランにアップグレードすると月50回まで分析できます。")
+            st.info("💡 プランのアップグレードはサイドバーのユーザー情報からお手続きください。")
+            st.stop()
+
         with st.spinner("分析データを取得中..."):
             result = analyze_company(stock_code, API_KEY)
+            if result:
+                if username == "guest":
+                    st.session_state.guest_usage = st.session_state.get("guest_usage", 0) + 1
+                else:
+                    update_usage(username)
 
         if not result:
             st.error("❌ 分析データの取得に失敗しました")
