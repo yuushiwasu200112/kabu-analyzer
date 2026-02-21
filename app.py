@@ -1725,9 +1725,7 @@ if stock_code:
 
             # SNSシェア
             cats = score_result["category_scores"]
-            share_text = f"{company_name}({stock_code})の投資スコア: {score}点
-収益性{cats.get('収益性',0)} / 安全性{cats.get('安全性',0)} / 成長性{cats.get('成長性',0)} / 割安度{cats.get('割安度',0)}
-#KabuAnalyzer #株式投資 #投資分析"
+            share_text = f"{company_name}({stock_code})の投資スコア: {score}点 収益性{cats.get('収益性',0)} / 安全性{cats.get('安全性',0)} / 成長性{cats.get('成長性',0)} / 割安度{cats.get('割安度',0)} #KabuAnalyzer #株式投資"
             import urllib.parse
             tweet_url = f"https://twitter.com/intent/tweet?text={urllib.parse.quote(share_text)}&url=https://kabu-analyzer.streamlit.app/"
             line_url = f"https://social-plugins.line.me/lineit/share?url=https://kabu-analyzer.streamlit.app/&text={urllib.parse.quote(share_text)}"
