@@ -371,7 +371,6 @@ if page == "複数社比較":
 if page == "ランキング":
     st.title("🏆 銘柄ランキング")
 
-    # DBからスコア取得
     from data.database import get_all_scores, get_scores_count
     db_count = get_scores_count()
 
@@ -381,68 +380,30 @@ if page == "ランキング":
         rank_col1, rank_col2 = st.columns(2)
         with rank_col1:
             rank_count = st.selectbox("表示件数", ["上位30銘柄", "上位100銘柄", "上位500銘柄", f"全{db_count}銘柄"], index=0)
-    with rank_col2:
-        sort_by = st.selectbox("並び替え基準", ["総合スコア", "収益性", "安全性", "成長性", "割安度"], index=0)
+        with rank_col2:
+            sort_by = st.selectbox("並び替え基準", ["総合スコア", "収益性", "安全性", "成長性", "割安度"], index=0)
 
-    count_map = {"上位30銘柄（速い）": 30, "上位100銘柄": 100, "全300銘柄（時間かかる）": 300}
-    max_count = count_map.get(rank_count, db_count)
-    target_stocks = dict(list(major_stocks.items())[:max_count])
+        count_map = {"上位30銘柄": 30, "上位100銘柄": 100, "上位500銘柄": 500}
+        max_count = count_map.get(rank_count, db_count)
 
-    st.markdown(f"**対象: {len(target_stocks)}銘柄**")
-
-    if st.button("🔍 ランキングを生成", type="primary"):
-        API_KEY = os.getenv("EDINET_API_KEY")
+        all_scores = get_all_scores(min_score=0, limit=max_count)
         rankings = []
-        progress = st.progress(0, text="分析中...")
-        total = len(target_stocks)
+        for s in all_scores:
+            rankings.append({
+                "code": s["stock_code"], "name": s["company_name"],
+                "total": s["total_score"], "profitability": s["profitability"],
+                "safety": s["safety"], "growth": s["growth"], "value": s["value"],
+                "roe": s.get("roe", 0), "per": s.get("per", 0), "dividend": s.get("dividend_yield", 0),
+            })
 
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
-        def _analyze_one(code_name):
-            code, name = code_name
-            if code not in CODE_MAP:
-                return None
-            try:
-                r = analyze_company(code, API_KEY)
-                if r:
-                    return {
-                        "code": code,
-                        "name": r["name"],
-                        "total": r["score"]["total_score"],
-                        "profitability": r["score"]["category_scores"].get("収益性", 0),
-                        "safety": r["score"]["category_scores"].get("安全性", 0),
-                        "growth": r["score"]["category_scores"].get("成長性", 0),
-                        "value": r["score"]["category_scores"].get("割安度", 0),
-                        "roe": r["indicators"].get("ROE", 0),
-                        "per": r["indicators"].get("PER", 0),
-                        "dividend": r["indicators"].get("配当利回り", 0),
-                    }
-            except:
-                pass
-            return None
-
-        done_count = 0
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {executor.submit(_analyze_one, (code, name)): code for code, name in target_stocks.items()}
-            for future in as_completed(futures):
-                done_count += 1
-                progress.progress(done_count / total, text=f"分析中... ({done_count}/{total})")
-                result_one = future.result()
-                if result_one:
-                    rankings.append(result_one)
-
-        progress.empty()
+        sort_key_map = {"総合スコア": "total", "収益性": "profitability", "安全性": "safety", "成長性": "growth", "割安度": "value"}
+        sort_k = sort_key_map.get(sort_by, "total")
+        rankings.sort(key=lambda x: x[sort_k], reverse=True)
 
         if rankings:
             import pandas as pd
             import plotly.graph_objects as go
 
-            # ソート基準に応じて並び替え
-            sort_key_map = {"総合スコア": "total", "収益性": "profitability", "安全性": "safety", "成長性": "growth", "割安度": "value"}
-            sort_k = sort_key_map.get(sort_by, "total")
-            rankings.sort(key=lambda x: x[sort_k], reverse=True)
-
-            # 上位表示
             st.subheader("🥇 総合スコア TOP10")
             for i, r in enumerate(rankings[:10]):
                 score = r["total"]
@@ -451,8 +412,6 @@ if page == "ランキング":
                 st.markdown(f"{medal} **{r['name']}**（{r['code']}）: {color} **{score}点** ｜ 収益性{r['profitability']} / 安全性{r['safety']} / 成長性{r['growth']} / 割安度{r['value']}")
 
             st.divider()
-
-            # 全銘柄テーブル
             st.subheader("📊 全銘柄スコア一覧")
             df = pd.DataFrame(rankings)
             df.columns = ["証券コード", "企業名", "総合スコア", "収益性", "安全性", "成長性", "割安度", "ROE", "PER", "配当利回り"]
@@ -460,54 +419,39 @@ if page == "ランキング":
             df = df[["順位", "証券コード", "企業名", "総合スコア", "収益性", "安全性", "成長性", "割安度", "ROE", "PER", "配当利回り"]]
             st.dataframe(df, use_container_width=True, hide_index=True)
 
-            # エクスポート
             exp_col1, exp_col2 = st.columns(2)
             with exp_col1:
-                csv = df.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 CSVダウンロード", csv, "ranking.csv", "text/csv")
+                csv = df.to_csv(index=False).encode("utf-8-sig")
+                st.download_button("📥 CSVダウンロード", csv, "ranking.csv", "text/csv", key="rank_csv")
             with exp_col2:
                 buf = io.BytesIO()
-                df.to_excel(buf, index=False, engine='openpyxl')
-                st.download_button("📥 Excelダウンロード", buf.getvalue(), "ranking.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                df.to_excel(buf, index=False, engine="openpyxl")
+                st.download_button("📥 Excelダウンロード", buf.getvalue(), "ranking.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="rank_xlsx")
 
-            # カテゴリ別TOP5
             st.divider()
             cat_cols = st.columns(4)
-            categories_rank = [
-                ("収益性", "profitability"),
-                ("安全性", "safety"),
-                ("成長性", "growth"),
-                ("割安度", "value"),
-            ]
-            for i, (cat_name, cat_key) in enumerate(categories_rank):
+            for i, (cat_name, cat_key) in enumerate([("収益性","profitability"),("安全性","safety"),("成長性","growth"),("割安度","value")]):
                 with cat_cols[i]:
                     st.markdown(f"**{cat_name} TOP5**")
                     sorted_cat = sorted(rankings, key=lambda x: x[cat_key], reverse=True)
                     for j, r in enumerate(sorted_cat[:5]):
-                        st.caption(f"{j+1}. {r['name']} ({r[cat_key]}点)")
+                        st.caption(f"{j+1}. {r['name'][:10]} ({r[cat_key]}点)")
 
-            # バーチャート
             st.divider()
             st.subheader("📈 スコア分布")
-            fig_bar = go.Figure(data=[
-                go.Bar(
-                    x=[r["name"][:6] for r in rankings[:15]],
-                    y=[r["total"] for r in rankings[:15]],
-                    marker_color=["#27AE60" if r["total"] >= 75 else "#F39C12" if r["total"] >= 50 else "#E74C3C" for r in rankings[:15]],
-                )
-            ])
-            fig_bar.update_layout(height=400, xaxis_title="銘柄", yaxis_title="総合スコア", yaxis_range=[0, 100])
+            fig_bar = go.Figure(data=[go.Bar(
+                x=[r["name"][:6] for r in rankings[:20]],
+                y=[r["total"] for r in rankings[:20]],
+                marker_color=["#27AE60" if r["total"]>=75 else "#F39C12" if r["total"]>=50 else "#E74C3C" for r in rankings[:20]],
+            )])
+            fig_bar.update_layout(height=400, yaxis_range=[0, 100])
             st.plotly_chart(fig_bar, use_container_width=True)
-        else:
-            st.error("❌ ランキングデータがありません")
     else:
         st.warning("📌 バッチ分析が未実行です。管理者にお問い合わせください。")
 
     st.divider()
     st.caption("⚠️ 本ツールは投資助言ではありません。")
     st.stop()
-
-# ========================================
 # ウォッチリストページ
 # ========================================
 if page == "ウォッチリスト":
