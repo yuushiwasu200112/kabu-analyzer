@@ -385,7 +385,7 @@ if page == "ランキング":
         sort_by = st.selectbox("並び替え基準", ["総合スコア", "収益性", "安全性", "成長性", "割安度"], index=0)
 
     count_map = {"上位30銘柄（速い）": 30, "上位100銘柄": 100, "全300銘柄（時間かかる）": 300}
-    max_count = count_map[rank_count]
+    max_count = count_map.get(rank_count, db_count)
     target_stocks = dict(list(major_stocks.items())[:max_count])
 
     st.markdown(f"**対象: {len(target_stocks)}銘柄**")
