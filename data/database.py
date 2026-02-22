@@ -99,6 +99,19 @@ def init_db():
         triggered_at TEXT DEFAULT CURRENT_TIMESTAMP
     )''')
 
+    c.execute("""CREATE TABLE IF NOT EXISTS stock_scores (
+        stock_code TEXT PRIMARY KEY,
+        company_name TEXT,
+        total_score INTEGER,
+        profitability INTEGER,
+        safety INTEGER,
+        growth INTEGER,
+        value INTEGER,
+        roe REAL, roa REAL, per REAL, pbr REAL,
+        dividend_yield REAL, operating_margin REAL, equity_ratio REAL,
+        judgment TEXT, updated_at TEXT
+    )""")
+
     conn.commit()
     conn.close()
 
@@ -218,6 +231,67 @@ def get_user_stats(username):
     top = [dict(r) for r in c.fetchall()]
     conn.close()
     return {"total_analyses": total, "unique_stocks": unique, "top_stocks": top}
+
+
+    # スコアキャッシュテーブル
+    c.execute("""CREATE TABLE IF NOT EXISTS stock_scores (
+        stock_code TEXT PRIMARY KEY,
+        company_name TEXT,
+        total_score INTEGER,
+        profitability INTEGER,
+        safety INTEGER,
+        growth INTEGER,
+        value INTEGER,
+        roe REAL, roa REAL, per REAL, pbr REAL,
+        dividend_yield REAL, operating_margin REAL, equity_ratio REAL,
+        judgment TEXT, updated_at TEXT
+    )""")
+
+    conn.commit()
+    conn.close()
+
+
+def save_stock_score(code, name, score_result, indicators):
+    import datetime
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""INSERT OR REPLACE INTO stock_scores
+        (stock_code, company_name, total_score, profitability, safety, growth, value,
+         roe, roa, per, pbr, dividend_yield, operating_margin, equity_ratio, judgment, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (code, name,
+         score_result["total_score"],
+         score_result["category_scores"].get("収益性", 0),
+         score_result["category_scores"].get("安全性", 0),
+         score_result["category_scores"].get("成長性", 0),
+         score_result["category_scores"].get("割安度", 0),
+         indicators.get("ROE", 0), indicators.get("ROA", 0),
+         indicators.get("PER", 0), indicators.get("PBR", 0),
+         indicators.get("配当利回り", 0), indicators.get("営業利益率", 0),
+         indicators.get("自己資本比率", 0),
+         score_result.get("judgment", ""),
+         datetime.datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+
+def get_all_scores(min_score=0, limit=3732):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""SELECT * FROM stock_scores WHERE total_score >= ?
+                 ORDER BY total_score DESC LIMIT ?""", (min_score, limit))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_scores_count():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) as cnt FROM stock_scores")
+    cnt = c.fetchone()["cnt"]
+    conn.close()
+    return cnt
 
 
 # 初期化実行

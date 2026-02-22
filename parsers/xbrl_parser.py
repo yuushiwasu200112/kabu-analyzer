@@ -106,7 +106,28 @@ def download_and_parse(doc_id, api_key):
     return parse_xbrl(xml_data)
 
 
+def extract_xbrl_from_zip(zip_data):
+    """ZIPからXBRLファイルを抽出"""
+    try:
+        z = zipfile.ZipFile(io.BytesIO(zip_data))
+        for name in z.namelist():
+            if name.endswith('.xbrl') and 'XBRL/PublicDoc/' in name:
+                return z.read(name)
+        # PublicDocがない場合
+        for name in z.namelist():
+            if name.endswith('.xbrl'):
+                return z.read(name)
+    except:
+        pass
+    return None
+
+
 def parse_xbrl(xml_data):
+    # ZIPの場合は展開
+    if xml_data[:2] == b'PK':
+        xml_data = extract_xbrl_from_zip(xml_data)
+        if not xml_data:
+            return None
     root = etree.fromstring(xml_data)
 
     # 全タグを収集（contextRef付き）

@@ -370,14 +370,17 @@ if page == "複数社比較":
 # ========================================
 if page == "ランキング":
     st.title("🏆 銘柄ランキング")
-    st.caption(f"投資スタイル: {style} ｜ 投資期間: {period}")
 
-    # 主要銘柄リスト読み込み
-    major_stocks = _load_major_stocks()
+    # DBからスコア取得
+    from data.database import get_all_scores, get_scores_count
+    db_count = get_scores_count()
 
-    rank_col1, rank_col2 = st.columns(2)
-    with rank_col1:
-        rank_count = st.selectbox("分析銘柄数", ["上位30銘柄（速い）", "上位100銘柄", "全300銘柄（時間かかる）"], index=0)
+    if db_count > 0:
+        st.caption(f"📊 {db_count}銘柄のスコアデータ（バッチ分析済み）")
+
+        rank_col1, rank_col2 = st.columns(2)
+        with rank_col1:
+            rank_count = st.selectbox("表示件数", ["上位30銘柄", "上位100銘柄", "上位500銘柄", f"全{db_count}銘柄"], index=0)
     with rank_col2:
         sort_by = st.selectbox("並び替え基準", ["総合スコア", "収益性", "安全性", "成長性", "割安度"], index=0)
 
@@ -496,7 +499,9 @@ if page == "ランキング":
             fig_bar.update_layout(height=400, xaxis_title="銘柄", yaxis_title="総合スコア", yaxis_range=[0, 100])
             st.plotly_chart(fig_bar, use_container_width=True)
         else:
-            st.error("❌ ランキングデータを取得できませんでした")
+            st.error("❌ ランキングデータがありません")
+    else:
+        st.warning("📌 バッチ分析が未実行です。管理者にお問い合わせください。")
 
     st.divider()
     st.caption("⚠️ 本ツールは投資助言ではありません。")
