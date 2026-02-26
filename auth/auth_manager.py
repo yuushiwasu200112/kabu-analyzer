@@ -133,6 +133,20 @@ def check_usage_limit(username):
     return usage < limit, usage, limit
 
 
+def reset_password(username, email, new_password):
+    """パスワードリセット（ユーザー名+メールアドレスで認証）"""
+    users = _load_users()
+    if username not in users:
+        return False, "ユーザーが見つかりません"
+    if users[username].get("email", "") != email:
+        return False, "メールアドレスが一致しません"
+    if len(new_password) < 6:
+        return False, "パスワードは6文字以上で設定してください"
+    users[username]["password"] = _hash_password(new_password)
+    _save_users(users)
+    return True, "パスワードをリセットしました"
+
+
 def show_login_page():
     """ログイン/登録ページを表示"""
     st.markdown("""
