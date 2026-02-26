@@ -335,7 +335,7 @@ if page == "プロフィール":
     exec(compile(open("ui_pages/profile.py", encoding="utf-8").read(), "ui_pages/profile.py", "exec"))
 
 if page == "管理者":
-    if st.session_state.get("username") in ["admin", "yuushiwasu"]:
+    if st.session_state.get("username") in ["admin", "yuushiwasu", "lucky0112"]:
         exec(compile(open("ui_pages/admin.py", encoding="utf-8").read(), "ui_pages/admin.py", "exec"))
     else:
         st.error("⛔ 管理者権限が必要です")
