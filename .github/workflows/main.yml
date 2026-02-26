@@ -1,0 +1,38 @@
+name: Daily Stock Analysis Batch
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  batch-analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install requests lxml yfinance openpyxl plotly
+
+      - name: Create secrets.toml
+        run: |
+          mkdir -p .streamlit
+          echo "EDINET_API_KEY = \"${{ secrets.EDINET_API_KEY }}\"" > .streamlit/secrets.toml
+
+      - name: Run daily batch
+        run: python batch_daily.py
+
+      - name: Commit results
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add data/kabu_analyzer.db batch_progress.json
+          git diff --cached --quiet || git commit -m "🤖 Daily batch: $(date +%Y-%m-%d)"
+          git push
