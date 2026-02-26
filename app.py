@@ -296,46 +296,46 @@ def analyze_company(code, api_key):
 # ページルーティング
 # ========================================
 if page == "複数社比較":
-    exec(open("ui_pages/compare.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/compare.py", encoding="utf-8").read(), "ui_pages/compare.py", "exec"))
 
 if page == "ランキング":
-    exec(open("ui_pages/ranking.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/ranking.py", encoding="utf-8").read(), "ui_pages/ranking.py", "exec"))
 
 if page == "ウォッチリスト":
-    exec(open("ui_pages/watchlist.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/watchlist.py", encoding="utf-8").read(), "ui_pages/watchlist.py", "exec"))
 
 if page == "ポートフォリオ":
-    exec(open("ui_pages/portfolio.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/portfolio.py", encoding="utf-8").read(), "ui_pages/portfolio.py", "exec"))
 
 if page == "配当カレンダー":
-    exec(open("ui_pages/dividend.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/dividend.py", encoding="utf-8").read(), "ui_pages/dividend.py", "exec"))
 
 if page == "アラート":
-    exec(open("ui_pages/alert.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/alert.py", encoding="utf-8").read(), "ui_pages/alert.py", "exec"))
 
 if page == "セクター分析":
-    exec(open("ui_pages/sector.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/sector.py", encoding="utf-8").read(), "ui_pages/sector.py", "exec"))
 
 if page == "バックテスト":
-    exec(open("ui_pages/backtest.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/backtest.py", encoding="utf-8").read(), "ui_pages/backtest.py", "exec"))
 
 if page == "スクリーニング":
-    exec(open("ui_pages/screening.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/screening.py", encoding="utf-8").read(), "ui_pages/screening.py", "exec"))
 
 if page == "買い増し最適化":
-    exec(open("ui_pages/buy_optimize.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/buy_optimize.py", encoding="utf-8").read(), "ui_pages/buy_optimize.py", "exec"))
 
 if page == "定期レポート":
-    exec(open("ui_pages/report.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/report.py", encoding="utf-8").read(), "ui_pages/report.py", "exec"))
 
 if page == "設定":
-    exec(open("ui_pages/settings.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/settings.py", encoding="utf-8").read(), "ui_pages/settings.py", "exec"))
 
 if page == "プロフィール":
-    exec(open("ui_pages/profile.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/profile.py", encoding="utf-8").read(), "ui_pages/profile.py", "exec"))
 
 if page == "利用規約":
-    exec(open("ui_pages/terms.py", encoding="utf-8").read())
+    exec(compile(open("ui_pages/terms.py", encoding="utf-8").read(), "ui_pages/terms.py", "exec"))
 
 # 利用規約/設定/プロフィールはst.stop()済み
 if page in ["利用規約", "設定", "プロフィール"]:
@@ -344,4 +344,4 @@ if page in ["利用規約", "設定", "プロフィール"]:
 # ========================================
 # 銘柄分析ページ（デフォルト）
 # ========================================
-exec(open("ui_pages/analysis.py", encoding="utf-8").read())
+exec(compile(open("ui_pages/analysis.py", encoding="utf-8").read(), "ui_pages/analysis.py", "exec"))
