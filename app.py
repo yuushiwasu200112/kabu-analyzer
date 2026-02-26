@@ -460,7 +460,11 @@ if page == "ウォッチリスト":
 
     # セッション初期化
     if "watchlist" not in st.session_state:
-        st.session_state.watchlist = []
+        try:
+            from data.database import get_watchlist
+            st.session_state.watchlist = get_watchlist(st.session_state.get("username", "guest"))
+        except:
+            st.session_state.watchlist = []
 
     # 銘柄追加
     add_col1, add_col2 = st.columns([3, 1])
@@ -575,7 +579,12 @@ if page == "ポートフォリオ":
     st.caption("保有銘柄のバランスとリスク分散をチェック")
 
     if "portfolio" not in st.session_state:
-        st.session_state.portfolio = []
+        try:
+            from data.database import get_portfolio
+            pf_rows = get_portfolio(st.session_state.get("username", "guest"))
+            st.session_state.portfolio = [{"code": p["stock_code"], "name": p["company_name"], "shares": p.get("amount", 0)} for p in pf_rows]
+        except:
+            st.session_state.portfolio = []
 
     # 銘柄追加
     pf_col1, pf_col2, pf_col3 = st.columns([2, 2, 1])
@@ -2399,6 +2408,10 @@ if stock_code:
             if stock_code not in st.session_state.watchlist:
                 if st.button("⭐ ウォッチリストに追加"):
                     st.session_state.watchlist.append(stock_code)
+                    try:
+                        from data.database import save_watchlist
+                        save_watchlist(st.session_state.get("username", "guest"), stock_code)
+                    except: pass
                     st.success("✅ ウォッチリストに追加しました")
             else:
                 st.info("⭐ ウォッチリスト登録済み")

@@ -1,23 +1,21 @@
 """
-スコアリングエンジン
-投資スタイル×投資期間で重み付けを変える
+スコアリングエンジン - v2（基準厳格化）
 """
-
 THRESHOLDS = {
-    "ROE":       {"excellent": 10, "zero": 0, "higher_is_better": True},
-    "ROA":       {"excellent": 5,  "zero": 0, "higher_is_better": True},
-    "営業利益率": {"excellent": 10, "zero": 0, "higher_is_better": True},
-    "配当利回り": {"excellent": 3,  "zero": 0, "higher_is_better": True},
-    "自己資本比率": {"excellent": 40, "zero": 0,   "higher_is_better": True},
-    "流動比率":     {"excellent": 150,"zero": 50,  "higher_is_better": True},
-    "有利子負債比率":{"excellent": 30, "zero": 60,  "higher_is_better": False},
-    "ICR":          {"excellent": 5,  "zero": 1,   "higher_is_better": True},
-    "売上高成長率":   {"excellent": 5,  "zero": -5, "higher_is_better": True},
-    "営業利益成長率": {"excellent": 10, "zero": -10,"higher_is_better": True},
-    "純利益成長率":   {"excellent": 10, "zero": -10,"higher_is_better": True},
-    "総資産成長率":   {"excellent": 5,  "zero": -5, "higher_is_better": True},
-    "PER": {"excellent": 15, "zero": 40, "higher_is_better": False},
-    "PBR": {"excellent": 1,  "zero": 3,  "higher_is_better": False},
+    "ROE":       {"excellent": 20, "good": 10, "zero": 0, "higher_is_better": True},
+    "ROA":       {"excellent": 10, "good": 5,  "zero": 0, "higher_is_better": True},
+    "営業利益率": {"excellent": 20, "good": 10, "zero": 0, "higher_is_better": True},
+    "配当利回り": {"excellent": 5,  "good": 3,  "zero": 0, "higher_is_better": True},
+    "自己資本比率": {"excellent": 70, "good": 40, "zero": 10, "higher_is_better": True},
+    "流動比率":     {"excellent": 300,"good": 150,"zero": 50, "higher_is_better": True},
+    "有利子負債比率":{"excellent": 10, "good": 30, "zero": 80, "higher_is_better": False},
+    "ICR":          {"excellent": 20, "good": 5,  "zero": 1,  "higher_is_better": True},
+    "売上高成長率":   {"excellent": 15, "good": 5,  "zero": -5, "higher_is_better": True},
+    "営業利益成長率": {"excellent": 20, "good": 10, "zero": -10,"higher_is_better": True},
+    "純利益成長率":   {"excellent": 25, "good": 10, "zero": -10,"higher_is_better": True},
+    "総資産成長率":   {"excellent": 10, "good": 5,  "zero": -5, "higher_is_better": True},
+    "PER": {"excellent": 10, "good": 15, "zero": 50, "higher_is_better": False},
+    "PBR": {"excellent": 0.8, "good": 1.5, "zero": 4, "higher_is_better": False},
 }
 
 CATEGORIES = {
@@ -27,32 +25,31 @@ CATEGORIES = {
     "割安度": {"PER": 35, "PBR": 35, "配当利回り": 30},
 }
 
-# 投資スタイル×投資期間の重み付けマトリクス
 STYLE_PERIOD_WEIGHTS = {
     "バリュー投資": {
-        "短期": {"収益性": 15, "安全性": 20, "成長性": 10, "割安度": 55},
-        "中期": {"収益性": 20, "安全性": 25, "成長性": 15, "割安度": 40},
-        "長期": {"収益性": 25, "安全性": 25, "成長性": 20, "割安度": 30},
+        "短期（〜1年）": {"収益性": 15, "安全性": 20, "成長性": 10, "割安度": 55},
+        "中期（1〜3年）": {"収益性": 20, "安全性": 25, "成長性": 15, "割安度": 40},
+        "長期（3年以上）": {"収益性": 25, "安全性": 25, "成長性": 20, "割安度": 30},
     },
     "グロース投資": {
-        "短期": {"収益性": 20, "安全性": 10, "成長性": 50, "割安度": 20},
-        "中期": {"収益性": 25, "安全性": 15, "成長性": 40, "割安度": 20},
-        "長期": {"収益性": 25, "安全性": 15, "成長性": 45, "割安度": 15},
+        "短期（〜1年）": {"収益性": 20, "安全性": 10, "成長性": 50, "割安度": 20},
+        "中期（1〜3年）": {"収益性": 25, "安全性": 15, "成長性": 40, "割安度": 20},
+        "長期（3年以上）": {"収益性": 25, "安全性": 15, "成長性": 45, "割安度": 15},
     },
     "高配当投資": {
-        "短期": {"収益性": 40, "安全性": 30, "成長性": 10, "割安度": 20},
-        "中期": {"収益性": 35, "安全性": 30, "成長性": 15, "割安度": 20},
-        "長期": {"収益性": 35, "安全性": 25, "成長性": 15, "割安度": 25},
+        "短期（〜1年）": {"収益性": 40, "安全性": 30, "成長性": 10, "割安度": 20},
+        "中期（1〜3年）": {"収益性": 35, "安全性": 30, "成長性": 15, "割安度": 20},
+        "長期（3年以上）": {"収益性": 35, "安全性": 25, "成長性": 15, "割安度": 25},
     },
     "安定性重視": {
-        "短期": {"収益性": 20, "安全性": 45, "成長性": 10, "割安度": 25},
-        "中期": {"収益性": 25, "安全性": 40, "成長性": 10, "割安度": 25},
-        "長期": {"収益性": 25, "安全性": 35, "成長性": 15, "割安度": 25},
+        "短期（〜1年）": {"収益性": 20, "安全性": 45, "成長性": 10, "割安度": 25},
+        "中期（1〜3年）": {"収益性": 25, "安全性": 40, "成長性": 10, "割安度": 25},
+        "長期（3年以上）": {"収益性": 25, "安全性": 35, "成長性": 15, "割安度": 25},
     },
     "バランス": {
-        "短期": {"収益性": 25, "安全性": 25, "成長性": 25, "割安度": 25},
-        "中期": {"収益性": 25, "安全性": 25, "成長性": 25, "割安度": 25},
-        "長期": {"収益性": 25, "安全性": 25, "成長性": 25, "割安度": 25},
+        "短期（〜1年）": {"収益性": 25, "安全性": 25, "成長性": 25, "割安度": 25},
+        "中期（1〜3年）": {"収益性": 25, "安全性": 25, "成長性": 25, "割安度": 25},
+        "長期（3年以上）": {"収益性": 25, "安全性": 25, "成長性": 25, "割安度": 25},
     },
 }
 
@@ -100,10 +97,16 @@ def score_category(category_name, indicators):
     return category_score, scores
 
 
-def calc_total_score(indicators, style="バランス", period="中期"):
-    """投資スタイル×投資期間に応じた総合スコアを算出"""
+def calc_total_score(indicators, style="バランス", period="中期（1〜3年）"):
     weights = STYLE_PERIOD_WEIGHTS.get(style, STYLE_PERIOD_WEIGHTS["バランス"])
-    weights = weights.get(period, weights.get("中期"))
+    # period名の部分一致
+    matched = None
+    for k in weights:
+        if period in k or k in period:
+            matched = weights[k]
+            break
+    if not matched:
+        matched = list(weights.values())[1]  # 中期デフォルト
 
     category_scores = {}
     detail = {}
@@ -113,7 +116,7 @@ def calc_total_score(indicators, style="バランス", period="中期"):
         detail[cat_name] = scores
 
     total = 0
-    for cat_name, weight in weights.items():
+    for cat_name, weight in matched.items():
         total += category_scores.get(cat_name, 0) * weight / 100
 
     total = max(0, min(100, round(total)))
