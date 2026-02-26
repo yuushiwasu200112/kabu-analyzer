@@ -273,3 +273,24 @@ def show_login_page():
                     st.error(f"❌ {msg}")
 
     st.stop()
+
+    with tab_reset:
+        st.subheader("🔄 パスワードリセット")
+        st.caption("登録時のユーザー名とメールアドレスを入力してください")
+        reset_user = st.text_input("ユーザー名", key="reset_user")
+        reset_email = st.text_input("メールアドレス", key="reset_email")
+        reset_pass = st.text_input("新しいパスワード（6文字以上）", type="password", key="reset_pass")
+        reset_pass2 = st.text_input("新しいパスワード（確認）", type="password", key="reset_pass2")
+        if st.button("🔄 パスワードをリセット", type="primary", key="btn_reset"):
+            if not reset_user or not reset_email or not reset_pass:
+                st.error("すべての項目を入力してください")
+            elif reset_pass != reset_pass2:
+                st.error("パスワードが一致しません")
+            else:
+                success, msg = reset_password(reset_user, reset_email, reset_pass)
+                if success:
+                    st.success(f"✅ {msg}")
+                else:
+                    st.error(f"❌ {msg}")
+
+    st.stop()
