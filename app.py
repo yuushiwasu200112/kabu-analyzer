@@ -139,7 +139,7 @@ st.markdown("""
 
 # ── サイドバー ──
 with st.sidebar:
-    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較", "ランキング", "ウォッチリスト", "ポートフォリオ", "配当カレンダー", "アラート", "セクター分析", "バックテスト", "スクリーニング", "買い増し最適化", "定期レポート", "利用規約", "設定", "プロフィール", "管理者"], index=0)
+    page = st.radio("📌 メニュー", ["銘柄分析", "複数社比較", "ランキング", "ウォッチリスト", "ポートフォリオ", "配当カレンダー", "アラート", "セクター分析", "バックテスト", "スクリーニング", "買い増し最適化", "定期レポート", "利用規約", "設定", "プロフィール", "アップグレード", "管理者"], index=0)
     st.divider()
     st.header("⚙️ 分析設定")
     style = st.selectbox("投資スタイル", ["バランス", "バリュー投資", "グロース投資", "高配当投資", "安定性重視"])
@@ -333,6 +333,9 @@ if page == "設定":
 
 if page == "プロフィール":
     exec(compile(open("ui_pages/profile.py", encoding="utf-8").read(), "ui_pages/profile.py", "exec"))
+
+if page == "アップグレード":
+    exec(compile(open("ui_pages/upgrade.py", encoding="utf-8").read(), "ui_pages/upgrade.py", "exec"))
 
 if page == "管理者":
     if st.session_state.get("username") in ["admin", "yuushiwasu", "lucky0112"]:
