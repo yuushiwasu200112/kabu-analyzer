@@ -1,21 +1,25 @@
 """
-スコアリングエンジン - v2（基準厳格化）
+スコアリングエンジン - v3（厳格化：100点はトップ企業のみ）
 """
 THRESHOLDS = {
-    "ROE":       {"excellent": 20, "good": 10, "zero": 0, "higher_is_better": True},
-    "ROA":       {"excellent": 10, "good": 5,  "zero": 0, "higher_is_better": True},
-    "営業利益率": {"excellent": 20, "good": 10, "zero": 0, "higher_is_better": True},
-    "配当利回り": {"excellent": 5,  "good": 3,  "zero": 0, "higher_is_better": True},
-    "自己資本比率": {"excellent": 70, "good": 40, "zero": 10, "higher_is_better": True},
-    "流動比率":     {"excellent": 300,"good": 150,"zero": 50, "higher_is_better": True},
-    "有利子負債比率":{"excellent": 10, "good": 30, "zero": 80, "higher_is_better": False},
-    "ICR":          {"excellent": 20, "good": 5,  "zero": 1,  "higher_is_better": True},
-    "売上高成長率":   {"excellent": 15, "good": 5,  "zero": -5, "higher_is_better": True},
-    "営業利益成長率": {"excellent": 20, "good": 10, "zero": -10,"higher_is_better": True},
-    "純利益成長率":   {"excellent": 25, "good": 10, "zero": -10,"higher_is_better": True},
-    "総資産成長率":   {"excellent": 10, "good": 5,  "zero": -5, "higher_is_better": True},
-    "PER": {"excellent": 10, "good": 15, "zero": 50, "higher_is_better": False},
-    "PBR": {"excellent": 0.8, "good": 1.5, "zero": 4, "higher_is_better": False},
+    # 収益性 - 日本企業の上位5%で100点
+    "ROE":       {"excellent": 30, "zero": 0, "higher_is_better": True},
+    "ROA":       {"excellent": 15, "zero": 0, "higher_is_better": True},
+    "営業利益率": {"excellent": 25, "zero": 0, "higher_is_better": True},
+    "配当利回り": {"excellent": 6,  "zero": 0, "higher_is_better": True},
+    # 安全性 - 厳格化
+    "自己資本比率": {"excellent": 80, "zero": 10, "higher_is_better": True},
+    "流動比率":     {"excellent": 400, "zero": 80, "higher_is_better": True},
+    "有利子負債比率":{"excellent": 0,  "zero": 80, "higher_is_better": False},
+    "ICR":          {"excellent": 50, "zero": 1,  "higher_is_better": True},
+    # 成長性 - 高成長のみ高得点
+    "売上高成長率":   {"excellent": 20, "zero": -5, "higher_is_better": True},
+    "営業利益成長率": {"excellent": 30, "zero": -10, "higher_is_better": True},
+    "純利益成長率":   {"excellent": 40, "zero": -15, "higher_is_better": True},
+    "総資産成長率":   {"excellent": 15, "zero": -5, "higher_is_better": True},
+    # 割安度
+    "PER": {"excellent": 8,   "zero": 50, "higher_is_better": False},
+    "PBR": {"excellent": 0.5, "zero": 4,  "higher_is_better": False},
 }
 
 CATEGORIES = {
@@ -99,14 +103,13 @@ def score_category(category_name, indicators):
 
 def calc_total_score(indicators, style="バランス", period="中期（1〜3年）"):
     weights = STYLE_PERIOD_WEIGHTS.get(style, STYLE_PERIOD_WEIGHTS["バランス"])
-    # period名の部分一致
     matched = None
     for k in weights:
         if period in k or k in period:
             matched = weights[k]
             break
     if not matched:
-        matched = list(weights.values())[1]  # 中期デフォルト
+        matched = list(weights.values())[1]
 
     category_scores = {}
     detail = {}
