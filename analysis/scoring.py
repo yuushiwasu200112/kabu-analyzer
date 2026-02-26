@@ -118,9 +118,20 @@ def calc_total_score(indicators, style="バランス", period="中期（1〜3年
         category_scores[cat_name] = score
         detail[cat_name] = scores
 
-    total = 0
+    # データがないカテゴリは按分（0点扱いしない）
+    active_weights = {}
+    missing_categories = []
     for cat_name, weight in matched.items():
-        total += category_scores.get(cat_name, 0) * weight / 100
+        if category_scores.get(cat_name, 0) == 0 and not detail.get(cat_name, {}):
+            missing_categories.append(cat_name)
+            continue
+        active_weights[cat_name] = weight
+
+    total_weight = sum(active_weights.values())
+    total = 0
+    if total_weight > 0:
+        for cat_name, weight in active_weights.items():
+            total += category_scores.get(cat_name, 0) * weight / total_weight
 
     total = max(0, min(100, round(total)))
 
@@ -138,4 +149,5 @@ def calc_total_score(indicators, style="バランス", period="中期（1〜3年
         "period": period,
         "category_scores": category_scores,
         "detail": detail,
+        "missing_categories": missing_categories,
     }
