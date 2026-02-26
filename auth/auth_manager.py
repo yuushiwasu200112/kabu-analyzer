@@ -158,7 +158,7 @@ def show_login_page():
     </div>
     """, unsafe_allow_html=True)
 
-    tab_login, tab_register = st.tabs(["🔑 ログイン", "📝 新規登録"])
+    tab_login, tab_register, tab_reset = st.tabs(["🔑 ログイン", "📝 新規登録", "🔄 パスワードリセット"])
 
     with tab_login:
         with st.form("login_form"):
