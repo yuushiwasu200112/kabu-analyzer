@@ -43,7 +43,7 @@ INDICATOR_FORMAT = {
 
 # ── 認証チェック ──
 from auth.auth_manager import show_login_page, check_usage_limit, update_usage, PLANS
-from data.database import save_analysis, get_analysis_history, get_user_stats, init_db
+from data.database import save_analysis_history as save_analysis, get_analysis_history, get_user_stats, init_db
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -139,6 +139,23 @@ st.markdown("""
 
 # ── サイドバー ──
 with st.sidebar:
+    # チュートリアル表示チェック
+    from ui_pages.tutorial import show_tutorial
+    import json
+    username = st.session_state.get("username", "")
+    tutorial_done = st.session_state.get("tutorial_done", False)
+    if not tutorial_done:
+        try:
+            with open("auth/users.json", "r") as f:
+                users = json.load(f)
+            tutorial_done = users.get(username, {}).get("tutorial_done", False)
+            st.session_state["tutorial_done"] = tutorial_done
+        except:
+            pass
+    if not tutorial_done:
+        show_tutorial()
+        st.stop()
+
     st.caption("📊 分析")
     page = st.radio("メニュー", [
         "銘柄分析",
