@@ -11,20 +11,19 @@ except:
     pass
 
 # SEO・OGP設定
+st.set_page_config(page_title="Kabu Analyzer", page_icon="📊", layout="wide")
+
 st.markdown("""
-<meta name="description" content="日本株3,732銘柄を瞬時にAI分析。収益性・安全性・成長性・割安度の4カテゴリで100点満点スコアリング。初心者でも使いやすい株式分析ツール。">
+<meta name="description" content="日本株3,732銘柄を瞬時にAI分析。収益性・安全性・成長性・割安度の4カテゴリで100点満点スコアリング。">
 <meta name="keywords" content="株式分析,日本株,スクリーニング,ランキング,ROE,PER,配当利回り,投資,財務分析,EDINET">
 <meta property="og:title" content="Kabu Analyzer - 日本株AI分析ツール">
 <meta property="og:description" content="3,732銘柄を瞬時に分析。収益性・安全性・成長性・割安度で100点満点スコアリング。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://kabu-analyzer.streamlit.app/">
-<meta property="og:image" content="https://kabu-analyzer.streamlit.app/~/+/media/logo.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Kabu Analyzer - 日本株AI分析ツール">
 <meta name="twitter:description" content="3,732銘柄を瞬時に分析。初心者でも使いやすい株式分析ツール。">
 """, unsafe_allow_html=True)
-
-st.set_page_config(page_title="Kabu Analyzer", page_icon="📊", layout="wide")
 
 try:
     if 'EDINET_API_KEY' in st.secrets:
